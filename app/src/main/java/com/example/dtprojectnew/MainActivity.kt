@@ -318,75 +318,18 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             false
         }
 
+        // Creating an instance of the PulseAnimation class
+        val pulseAnimation = PulseAnimation()
 
-        fun calculateAnimationDuration(): Long {
-            val pulseValue = binding.tvPulse.text.toString().toIntOrNull() ?: 0
-            return if (pulseValue > 0) {
-                (1000L * 60 / pulseValue).coerceIn(300L, 1000L)
-            } else {
-                0L
-            }
-        }
+        // Getting the pulse value from the TextView. If the text cannot be parsed to an Int, it defaults to 0
+        val pulseValue = binding.tvPulse.text.toString().toIntOrNull() ?: 0
 
-        fun createPulseAnimation(): ScaleAnimation {
-            return ScaleAnimation(
-                1.0f, 1.2f, 1.0f, 1.2f,
-                Animation.RELATIVE_TO_SELF, 0.5f,
-                Animation.RELATIVE_TO_SELF, 0.5f
-            ).apply {
-                duration = calculateAnimationDuration()
-                repeatMode = Animation.REVERSE
-                repeatCount = Animation.INFINITE
-            }
-        }
-        // Load the pulse animation from the resources
-        val pulseAnimation = createPulseAnimation()
-        // Set up an Animation listener to restart the animation when it ends
-        pulseAnimation.setAnimationListener(object : Animation.AnimationListener {
-            override fun onAnimationStart(animation: Animation) {}
-            override fun onAnimationEnd(animation: Animation) {
-                fun calculateAnimationDuration(): Long {
-                    val pulseValue = binding.tvPulse.text.toString().toIntOrNull() ?: 0
-                    return if (pulseValue > 0) {
-                        (1000L * 60 / pulseValue).coerceIn(1000L * 60 / 220, 1000L * 60)
-                    } else {
-                        0L
-                    }
-                }
+        // Starting the pulse animation on the ImageView using the pulse value
+        pulseAnimation.startAnimation(binding.ivHeart, pulseValue)
 
-                fun createPulseAnimation(): ScaleAnimation {
-                    return ScaleAnimation(
-                        1.0f, 1.2f, 1.0f, 1.2f,
-                        Animation.RELATIVE_TO_SELF, 0.5f,
-                        Animation.RELATIVE_TO_SELF, 0.5f
-                    ).apply {
-                        duration = calculateAnimationDuration()
-                        repeatMode = Animation.REVERSE
-                        repeatCount = Animation.INFINITE
-                    }
-                }
-                // Load the pulse animation from the resources
-                val pulseAnimation = createPulseAnimation()
-                // Set up an Animation listener to restart the animation when it ends
-                pulseAnimation.setAnimationListener(object : Animation.AnimationListener {
-                    override fun onAnimationStart(animation: Animation) {}
-                    override fun onAnimationEnd(animation: Animation) {
-                        pulseAnimation.duration = calculateAnimationDuration()
-                        if (pulseAnimation.duration > 0) {
-                            pulseAnimation.reset()
-                            binding.ivHeart.startAnimation(pulseAnimation)
-                        }
-                    }
 
-                    override fun onAnimationRepeat(animation: Animation) {}
-                })
-                binding.ivHeart.startAnimation(pulseAnimation)
-            }
 
-            override fun onAnimationRepeat(animation: Animation) {}
-        })
-        binding.ivHeart.startAnimation(pulseAnimation)
-        //increase pulse value by 10 per button click
+
 
         binding.btnConnect.setOnClickListener{
             ConnectwithDevice(this)
