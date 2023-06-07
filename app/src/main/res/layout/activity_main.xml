@@ -234,6 +234,14 @@
         </FrameLayout>
 
     </androidx.cardview.widget.CardView>
+    <Button
+        android:id="@+id/btn_clear_map"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Clear Map"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"/>
+
     <Switch
         android:id="@+id/switch_start_stop"
         android:layout_width="wrap_content"

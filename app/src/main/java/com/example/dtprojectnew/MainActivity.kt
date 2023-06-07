@@ -4,8 +4,6 @@ package com.example.dtprojectnew
 import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.view.animation.Animation
-import android.view.animation.ScaleAnimation
 import com.example.dtprojectnew.databinding.ActivityMainBinding
 import android.content.Context
 import android.content.SharedPreferences
@@ -16,7 +14,6 @@ import android.view.MotionEvent
 import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
 import com.google.gson.Gson
-import kotlin.random.Random
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -32,30 +29,97 @@ import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.nfc.Tag
 import androidx.core.app.ActivityCompat
 import com.example.bluetoothtest.MassPermission
+import com.google.android.gms.maps.model.PolylineOptions
+import java.lang.Math.cos
 import java.util.UUID
 
 data class MonitoredData(
     val speed: Float,
     val height: Float,
     val pulse: Int,
-    val location: String
+    val location: String,
+    val pathM: MutableList<LatLng> = mutableListOf()
 )
 val BtInterface:BluetoothInterface = BluetoothInterface()
 
 val UI:UIInterface = UIInterface()
 val Obs:ConnectionObserver = ConnectionObserver()
 
-class MainActivity : AppCompatActivity(), OnMapReadyCallback {
-    lateinit var fnd: BluetoothDevice
 
+
+
+class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider {
+    lateinit var fnd: BluetoothDevice
+    private val mapUpdateRunnable = MapUpdateRunnable(this)
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var binding: ActivityMainBinding
     private val recordedData = mutableListOf<MonitoredData>()
     private var isRecording = false
     private lateinit var mMap: GoogleMap
-    private fun getDataFromSensors(): MonitoredData {
+
+    private var samplelocation: String = "48.76508,11.42372"
+    private val path: MutableList<LatLng> = mutableListOf()
+    private var inmap = false
+    private fun moveNorthAndEast() {
+        val coordinates = samplelocation.split(",")
+        val currentLat = coordinates[0].toDouble()
+        val currentLng = coordinates[1].toDouble()
+
+        // Radius of the Earth in meters
+        val R = 6371000.0
+
+        // Distance to move in meters
+        val dn = 10.0
+        val de = 10.0
+
+        // Coordinate offsets in radians
+        val dLat = dn / R
+        val dLng = de / (R * cos(Math.PI * currentLat / 180))
+
+        // New coordinates in degrees
+        val newLat = currentLat + dLat * 180 / Math.PI
+        val newLng = currentLng + dLng * 180 / Math.PI
+
+        samplelocation = "$newLat,$newLng"
+        // Update the path
+        path.add(LatLng(newLat, newLng))
+
+        // Draw the updated path
+        drawPath()
+    }
+    private fun clearMap() {
+        if(::mMap.isInitialized) {
+            mMap.clear() // Clear the entire map
+            path.clear() // Clear the path array
+        }
+    }
+
+    private fun drawPath() {
+        if(::mMap.isInitialized && path.isNotEmpty()) {
+            // Clear the old path
+            mMap.clear()
+
+            // Add a marker at the current location
+            mMap.addMarker(MarkerOptions().position(path.last()).title("Current Location"))
+
+            // Draw the new path
+            mMap.addPolyline(PolylineOptions().addAll(path))
+
+            // Move the camera to the last point in the path
+            if (!inmap){
+                mMap.moveCamera(CameraUpdateFactory.newLatLng(path.last()))
+            }
+        }
+    }
+
+    // Declare the variable
+    private lateinit var mapUpdateProvider: MapUpdateProvider
+    override fun getDataFromSensors(): MonitoredData {
+        //return MonitoredData(UI.Speed, UI.Degree, UI.Bpm, UI.Location)
+
         return MonitoredData(UI.Speed, UI.Degree, UI.Bpm, UI.Location)
     }
 
@@ -194,7 +258,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private val updateTextViewsRunnable = object : Runnable {
         override fun run() {
             updateTextViews()
-            handler.postDelayed(this, 100) // Update text views every 100 ms (1 second)
+            handler.postDelayed(this, 500) // Update text views every 100 ms (1 second)
         }
     }
 
@@ -272,13 +336,29 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         mMap = googleMap
     }
 
-    private fun updateLocationOnMap(location: String) {
-        if(::mMap.isInitialized) {
+    override fun updateLocationOnMap(location: String) {
+
+        //Log.i("Mapdebug","outside")
+        if(::mMap.isInitialized&&(location!="")) {
+            //Log.i("Mapdebug"," 1inupdateLocationOnMap location: $location")
             mMap.clear()
             val coordinates = location.split(",")
             val latLng = LatLng(coordinates[0].toDouble(), coordinates[1].toDouble())
             mMap.addMarker(MarkerOptions().position(latLng).title("Marker"))
-            mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng))
+
+            if (!inmap){
+                mMap.animateCamera(CameraUpdateFactory.newLatLng(latLng))
+            }
+
+
+            // Update the path
+            path.add(LatLng(coordinates[0].toDouble(),coordinates[1].toDouble()))
+
+            // Draw the new path
+            mMap.addPolyline(PolylineOptions().addAll(path))
+
+            //sample values
+            //moveNorthAndEast()
         }
     }
 
@@ -288,10 +368,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         setContentView(binding.root)
         sharedPreferences = getSharedPreferences("appData", MODE_PRIVATE)
         handler.post(updateTextViewsRunnable)
+        mapUpdateRunnable.start()
+
+
+
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
 
         mapFragment.getMapAsync { googleMap ->
+
+            mMap = googleMap
+
             googleMap.setOnMapClickListener {
                 // Do nothing here, we just want to intercept the event
             }
@@ -304,9 +391,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 if (reason == GoogleMap.OnCameraMoveStartedListener.REASON_GESTURE) {
                     // The user made a gesture on the map, so disable the ScrollView
                     binding.customScrollView.setScrollingEnabled(false)
+                    inmap = true
                 } else if (reason == GoogleMap.OnCameraMoveStartedListener.REASON_DEVELOPER_ANIMATION) {
                     // The map is being moved due to a programmatic change, so enable the ScrollView
                     binding.customScrollView.setScrollingEnabled(true)
+                    inmap = false
                 }
             }
         }
@@ -314,6 +403,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             if (event.action == MotionEvent.ACTION_DOWN) {
                 // Der Benutzer hat die Scrollansicht berÃ¼hrt, also aktivieren wir das Scrollen.
                 binding.customScrollView.setScrollingEnabled(true)
+                inmap = false
             }
             false
         }
@@ -329,7 +419,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
 
-
+        binding.btnClearMap.setOnClickListener{
+            AlertDialog.Builder(this)
+                .setTitle("Clear Map")
+                .setMessage("Are you sure you want to clear the map?")
+                .setPositiveButton("Yes") { dialog, _ ->
+                    clearMap()
+                    dialog.dismiss()
+                }
+                .setNegativeButton("No") { dialog, _ ->
+                    // Do nothing, user cancelled
+                    dialog.dismiss()
+                }
+                .show()
+        }
 
         binding.btnConnect.setOnClickListener{
             ConnectwithDevice(this)
@@ -357,7 +460,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(updateTextViewsRunnable)
-
+        mapUpdateRunnable.stop()
         unregisterReceiver(disc)
         //Thread interrupten, dort wird das interrupt flag gesetzt, darauf wird auch überprüft
         BtInterface.interrupt()
