@@ -50,6 +50,10 @@ val Obs:ConnectionObserver = ConnectionObserver()
 
 
 
+//TODO Samir:
+//  Das ding schmiert ab und an mal ab weil es irgendwie den Socket nich richtig createn kann.
+//  Der Connect Button sollte auch andersherum funktionieren vielleicht, also für nen Disconnect Sorgen bei erneutem drücken.
+//  Guck dir nochma den ganzen Ablauf an der müsste besser gehen im Sinne von was passiert wenn, wann Buttons gedrückt werden und was dann passieren soll, vielleicht ein paar Alerts mit Infos gut...
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider {
     lateinit var fnd: BluetoothDevice
@@ -178,6 +182,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
                         Obs.addInterface(UI)
                         BtInterface.addObserver(Obs)
                         BtInterface.start()
+                        showSavedProfiles()
                     }
                 } else {
                     Log.v("Main", "Adress Not Found I Scan for a device")
@@ -216,6 +221,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
                             Obs.addInterface(UI)
                             BtInterface.addObserver(Obs)
                             BtInterface.start()
+                            showSavedProfiles()
                         }
                     }
                     else if(!::fnd.isInitialized){
@@ -442,7 +448,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
             val pckg:Package = Package(HeaderTypes.LOCK.value)
             pckg.intToBytes(1)
             pckg.Logpckg()
-            BtInterface.send(pckg)
+            try{BtInterface.send(pckg)}
+            catch(e:UninitializedPropertyAccessException){}
         }
 
         binding.btnStorageSelection.setOnClickListener {
@@ -456,6 +463,68 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
 
 
     }
+
+    //falls später mal nötig, weil lieber zoll als cm
+    //Zoll = Zentimeter / 2,54
+    //Zentimeter = Zoll * 2,54
+    private fun showSavedProfiles() {
+        val TAG:String = "ShowSavedProfiles"
+        val profileStorage = ProfileStorage(this)
+        val profiles = profileStorage.loadProfiles()
+
+        //Mal gucken wie man das macht, mit der Anzeige, man kann das bestimmt schöner lösen als in einer Zeile
+        val profileNames = profiles.map { profile -> "${profile.name}, ${profile.value}cm" }.toTypedArray()
+
+        val alertDialogBuilder = AlertDialog.Builder(this)
+        alertDialogBuilder.setTitle("Saved")
+        alertDialogBuilder.setItems(profileNames) { _, index ->
+            val selectedProfile = profiles[index]
+            Log.i(TAG, "Chosen Profil: ${selectedProfile.name}, ${selectedProfile.value}cm")
+
+            val pckg:Package = Package(HeaderTypes.RADIUS.value)
+            pckg.floatToBytes(selectedProfile.value, 3)
+            pckg.Logpckg()
+            try{BtInterface.send(pckg)}
+            catch(e:UninitializedPropertyAccessException){}
+
+        }
+
+        alertDialogBuilder.setPositiveButton("Create Profile") { _, _ ->
+            showCreateProfileDialog()
+        }
+
+        val dialog = alertDialogBuilder.create()
+        dialog.show()
+    }
+
+    private fun showCreateProfileDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.create_profile, null)
+        val dialogBuilder = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setTitle("Create Profile")
+            .setPositiveButton("Save") { _, _ ->
+                val profileName = dialogView.findViewById<EditText>(R.id.etProfileName).text.toString()
+                val profileValue = dialogView.findViewById<EditText>(R.id.etProfileValue).text.toString().toFloatOrNull()
+
+                if (profileName.isNotEmpty() && profileValue != null) {
+                    val profile = Profile(profileName, profileValue)
+                    val profileStorage = ProfileStorage(this)
+                    profileStorage.saveProfile(profile)
+                    val pckg:Package = Package(HeaderTypes.RADIUS.value)
+
+                    pckg.floatToBytes(profile.value, 3)
+                    pckg.Logpckg()
+                    try{BtInterface.send(pckg)}
+                    catch(e:UninitializedPropertyAccessException){}
+
+                }
+            }
+            .setNegativeButton("Abort", null)
+
+        val dialog = dialogBuilder.create()
+        dialog.show()
+    }
+
 
     override fun onDestroy() {
         super.onDestroy()

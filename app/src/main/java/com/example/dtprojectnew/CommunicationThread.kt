@@ -72,6 +72,8 @@ class BluetoothInterface:Thread() {
     }
 
     public fun send(pckg:Package){
+        Log.i(TAG, "Sending this Package")
+        pckg.Logpckg()
         Outpt.write(pckg.Header)
         Outpt.write(pckg.Msg)
     }

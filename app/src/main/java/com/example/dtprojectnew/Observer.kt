@@ -11,6 +11,7 @@ enum class HeaderTypes(val value: Byte) {
     PULS (0x03.toByte()),
     LOCK (0x05.toByte()),
     LOCATION (0x04.toByte()),
+    RADIUS (0x06.toByte()),
     STOP (0xF0.toByte()),
     CONTINUE (0xF1.toByte()),
     EXIT (0xF2.toByte()),

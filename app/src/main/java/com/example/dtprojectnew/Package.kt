@@ -81,6 +81,10 @@ class Package {
 
         intToBytes(intValue)
 
+        //Wenn es garkeine Nachkommastelle hat lass das unten einfach sein
+        if(aftPoint == 0)
+            return
+
         // Anzahl der Byte-Pakete für die Nachkommastellen
         var numaftBytes:UInt = 0u
         if (precision > 0) {
