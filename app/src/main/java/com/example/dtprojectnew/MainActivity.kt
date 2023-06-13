@@ -510,8 +510,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
                     val profile = Profile(profileName, profileValue)
                     val profileStorage = ProfileStorage(this)
                     profileStorage.saveProfile(profile)
-                    val pckg:Package = Package(HeaderTypes.RADIUS.value)
 
+                    //Sending that we are connected
+                    var pckg:Package = Package(HeaderTypes.CONNECTED.value)
+                    pckg.intToBytes(1)
+                    try { BtInterface.send(pckg) }
+                    catch(e:UninitializedPropertyAccessException){}
+                    //Sending the value
+
+                    pckg = Package(HeaderTypes.RADIUS.value)
                     pckg.floatToBytes(profile.value, 3)
                     pckg.Logpckg()
                     try{BtInterface.send(pckg)}
@@ -532,7 +539,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
         mapUpdateRunnable.stop()
         unregisterReceiver(disc)
         //Thread interrupten, dort wird das interrupt flag gesetzt, darauf wird auch überprüft
-        BtInterface.interrupt()
+        val pckg:Package = Package(HeaderTypes.CONNECTED.value)
+        pckg.intToBytes(0)
+        try {BtInterface.send(pckg)}
+        catch(e:UninitializedPropertyAccessException){
+            Log.e("OnDestroy", "BtInterface was not inititialized couldnt send not connected")
+        }
+        try{BtInterface.interrupt()}
+        catch(e:UninitializedPropertyAccessException){
+            Log.e("OnDestroy", "BtInterface was not inititialized before interrupt")
+        }
     }
 
 }

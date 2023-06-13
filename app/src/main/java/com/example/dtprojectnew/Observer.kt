@@ -1,7 +1,6 @@
 package com.example.dtprojectnew
 
 
-import android.hardware.SensorAdditionalInfo
 import android.util.Log
 
 //TODO mache ein KLassen UML für die Observer Klasse, und mache das mit dem LOCK und gucke das der Observer richtig läuft
@@ -14,6 +13,7 @@ enum class HeaderTypes(val value: Byte) {
     RADIUS (0x06.toByte()),
     STOP (0xF0.toByte()),
     CONTINUE (0xF1.toByte()),
+    CONNECTED (0xF4.toByte()),
     EXIT (0xF2.toByte()),
     MSG (0xF3.toByte()),
     ERROR (0xFF.toByte())
@@ -62,7 +62,7 @@ class ConnectionObserver() :Observer() {
             HeaderTypes.LOCK.value->{
                 Log.i(TAG, "Lock")
                 for(k in UI)
-                    k.set_Lock(fnct());
+                    k.set_Lock(fnct())
             }
             HeaderTypes.DEGREE.value -> {
                 Log.i(TAG, "Grad")
