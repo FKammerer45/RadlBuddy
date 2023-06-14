@@ -7,6 +7,7 @@ import android.util.Log
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.lang.NullPointerException
 import java.sql.Connection
 import java.util.UUID
 import kotlin.reflect.typeOf
@@ -28,9 +29,17 @@ class BluetoothInterface:Thread() {
     public fun removeObserver(Obs:Observer){
         Observers.remove(Obs)
     }
+    public fun is_connected():Boolean{
+        if(!::mmSckt.isInitialized)
+            return false
+        if (mmSckt != null && mmSckt.isConnected)
+            return true
+        else
+            return false
+    }
     @SuppressLint("MissingPermission")
     public fun set_Socket(fnd: BluetoothDevice, KNOWN_SPP_UUID: UUID):Boolean{
-
+        stop_listening = false
         Log.i(TAG,"Trying to open Socket for ${fnd.name} : ${fnd.address} ")
         try {
             mmSckt = fnd.createInsecureRfcommSocketToServiceRecord(KNOWN_SPP_UUID)
@@ -93,9 +102,8 @@ class BluetoothInterface:Thread() {
 
     public override fun run(){
 
-        var type:Byte//TODO vielleicht hier schon den Typ auslesen?
         try{
-            while(!stop_listening || !currentThread().isInterrupted){
+            while(!stop_listening && !currentThread().isInterrupted){
                 //Log.i(TAG, "Current available Inpt ${Inpt.available()}")
 
 //					  additional information
@@ -141,11 +149,15 @@ class BluetoothInterface:Thread() {
 
         //Wenn Interrupted wurde Socket schließen
         mmSckt.close()
+
         Log.i(TAG,"Thread ended Successfully")
     }
 
+    public fun disconnect(){
+        stop_listening = true
+    }
     public override fun interrupt() {
-        super.interrupt()
         Log.i(TAG, "Thread was properly terminated")
+        super.interrupt()
     }
 }

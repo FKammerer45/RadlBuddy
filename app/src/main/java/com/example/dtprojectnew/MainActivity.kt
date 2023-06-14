@@ -29,6 +29,7 @@ import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.nfc.Tag
 import androidx.core.app.ActivityCompat
 import com.example.bluetoothtest.MassPermission
@@ -43,7 +44,7 @@ data class MonitoredData(
     val location: String,
     val pathM: MutableList<LatLng> = mutableListOf()
 )
-val BtInterface:BluetoothInterface = BluetoothInterface()
+lateinit var BtInterface:BluetoothInterface
 
 val UI:UIInterface = UIInterface()
 val Obs:ConnectionObserver = ConnectionObserver()
@@ -127,20 +128,56 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
         return MonitoredData(UI.Speed, UI.Degree, UI.Bpm, UI.Location)
     }
 
+    fun con_disconwithDevice(){
+        val TAG = "con_discnwithDevice"
+        if(::BtInterface.isInitialized && BtInterface.is_connected()){
+            Log.i(TAG, "Disconnecting Device")
+            binding.btnConnect.setText("Connect")
+            disconnectDevice()
+        }
+        else{
+            BtInterface = BluetoothInterface()
+            Log.i(TAG, "Connecting Device")
+            if(ConnectwithDevice())
+                binding.btnConnect.setText("Disconnect")
+        }
+    }
+    fun disconnectDevice(){
+        //Thread interrupten, dort wird das interrupt flag gesetzt, darauf wird auch überprüft
+        val pckg:Package = Package(HeaderTypes.CONNECTED.value)
+        pckg.intToBytes(0)
+        try {BtInterface.send(pckg)}
+        catch(e:UninitializedPropertyAccessException){
+            Log.e("OnDestroy", "BtInterface was not inititialized couldnt send not connected")
+        }
+        try{BtInterface.interrupt()}
+        catch(e:UninitializedPropertyAccessException){
+            Log.e("OnDestroy", "BtInterface was not inititialized before interrupt")
+        }
+    }
     @SuppressLint("MissingPermission")
-    fun ConnectwithDevice(view: MainActivity) {
+    fun ConnectwithDevice():Boolean {
         Log.v("Main", "You clicked the right Button. There's just one but still good job.")
         val bluetoothManager: BluetoothManager = getSystemService(BluetoothManager::class.java)
 
-        if (bluetoothManager.adapter == null)
-            Log.v(
-                "Main",
-                "How do you not have Bluetooth? Bro add me on Discord I wanna know: FUKA Strong Woman#2494"
-            )
+        if (bluetoothManager.adapter == null){
+            val alertDialogBuilder = AlertDialog.Builder(this)
+            alertDialogBuilder.setTitle("Searching went wrong")
+            alertDialogBuilder.setMessage("Your Device HAS no bluetooth??")
+
+            val dialog = alertDialogBuilder.create()
+            dialog.show()
+
+            return false
+        }
         if (bluetoothManager.adapter?.isEnabled == false){
-            Log.v("Error", "Bluetooth is off. Someone needs to be punished")
-            Log.i("Main", "I would like to turn Bluetooth on but someone has Android API 33.")
-            //btn.apply{text = "Activate Bluetooth and Click again"}
+            val alertDialogBuilder = AlertDialog.Builder(this)
+            alertDialogBuilder.setTitle("Searching went wrong")
+            alertDialogBuilder.setMessage("Enable Bluetooth and try again")
+
+            val dialog = alertDialogBuilder.create()
+            dialog.show()
+            return false
         }
 
         else if (bluetoothManager.adapter?.isEnabled == true) {
@@ -177,17 +214,36 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
                     //btn.apply{text = "Connecting..."}
                     val Adpt:BluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
                     val device = Adpt.getRemoteDevice(wanted.address)
+
                     if(BtInterface.set_Socket(device, UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))){
                         //TODO trenn das obere möglichst bald wieder in zwei BtInterface.connect_to_Socket()
                         Obs.addInterface(UI)
                         BtInterface.addObserver(Obs)
                         BtInterface.start()
                         showSavedProfiles()
+                        return true
+                    }
+                    else {
+                        val alertDialogBuilder = AlertDialog.Builder(this@MainActivity)
+                        alertDialogBuilder.setTitle("Connecting went wrong")
+                        alertDialogBuilder.setMessage("Maybe your Microcontroller is turned off?")
+
+                        val dialog = alertDialogBuilder.create()
+                        dialog.show()
+                        return false
                     }
                 } else {
                     Log.v("Main", "Adress Not Found I Scan for a device")
                     //muss eigetentlich wahrscheinlich nach coarse location und fine location überprüfen
+                    if(!isLocationEnabled(this@MainActivity)){
+                        val alertDialogBuilder = AlertDialog.Builder(this)
+                        alertDialogBuilder.setTitle("Searching went wrong")
+                        alertDialogBuilder.setMessage("Enable Location and try again")
 
+                        val dialog = alertDialogBuilder.create()
+                        dialog.show()
+                        return false
+                    }
                     //btn.apply{text = "Searching for nearby Devices..."}
                     val filter = IntentFilter()
                     filter.addAction(BluetoothDevice.ACTION_FOUND)
@@ -197,11 +253,21 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
                     //if(!bluetoothManager.adapter.startDiscovery()) btn.apply{text = "Activate Location on your Device and try again"}
                 }
             } else
-                Log.v("Error", "Not the Permission to watch bluetooth")
+                return false
+
             //TODO get the Permission to use Bluetooth
         } else
-            Log.v("Error", "Bluetooth is somehow not possible. Women am I right.")
+            return false
+        return false
     }
+
+    fun isLocationEnabled(context: Context): Boolean {
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+    }
+
+
     @SuppressLint("MissingPermission")
     var disc = object: BroadcastReceiver(){
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -215,17 +281,25 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
                     Log.i(TAG, "Finished Discovery")
                     //Überprüfe ein Gerät gefunden wurde mit passender IP
                     if(::fnd.isInitialized && fnd != null){
-                        //Wenn Gerät gefunden öffne einen Socket zu dem Gerät und starte dann das Interface
+                        //Wenn Gerät gefunden öffne einen Socket zu dem Gerät und starte dann das Interface sollte man abfangen, dass das Gerät
+                        //in der Zwischenzeit ausgemacht wurde?? wäre schon irgendwie Schwachsinn das zu tun bzw vielleicht gehen Baterrien leer
                         if(BtInterface.set_Socket(fnd, UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))){
                             //TODO trenn das obere möglichst bald wieder in zwei BtInterface.connect_to_Socket()
                             Obs.addInterface(UI)
                             BtInterface.addObserver(Obs)
                             BtInterface.start()
                             showSavedProfiles()
+                            binding.btnConnect.setText("Disconnect")
                         }
                     }
                     else if(!::fnd.isInitialized){
-                        Log.i(TAG, "HC-05 probably not in range or turned off")
+                        Log.e(TAG, "HC-05 probably not in range or turned off")
+                        val alertDialogBuilder = AlertDialog.Builder(this@MainActivity)
+                        alertDialogBuilder.setTitle("Searching went wrong")
+                        alertDialogBuilder.setMessage("Maybe your Microcontroller is turned off?")
+
+                        val dialog = alertDialogBuilder.create()
+                        dialog.show()
                     }
                 }
                 BluetoothDevice.ACTION_FOUND->{
@@ -234,7 +308,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
                     val device = intent?.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
 
                     if(device!=null){
-                        //ls.add(device)
                         if(context!=null){
                             if (ActivityCompat.checkSelfPermission(
                                     context,
@@ -247,6 +320,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
                             if(device.address == "00:22:09:01:02:9E"){
                                 fnd = device
                                 Log.d(TAG, "Found the Device")
+                                //val bluetoothManager: BluetoothManager = getSystemService(BluetoothManager::class.java)
+                                //bluetoothManager.adapter?.cancelDiscovery()
                             }
                         }
                         else
@@ -441,7 +516,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
         }
 
         binding.btnConnect.setOnClickListener{
-            ConnectwithDevice(this)
+            con_disconwithDevice()
         }
 
         binding.btnLock.setOnClickListener {
@@ -494,6 +569,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
         }
 
         val dialog = alertDialogBuilder.create()
+        dialog.setCanceledOnTouchOutside(false)
         dialog.show()
     }
 
@@ -529,12 +605,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
             .setNegativeButton("Abort", null)
 
         val dialog = dialogBuilder.create()
+        dialog.setCanceledOnTouchOutside(false)
         dialog.show()
     }
 
 
     override fun onDestroy() {
-        super.onDestroy()
         handler.removeCallbacks(updateTextViewsRunnable)
         mapUpdateRunnable.stop()
         unregisterReceiver(disc)
@@ -549,6 +625,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
         catch(e:UninitializedPropertyAccessException){
             Log.e("OnDestroy", "BtInterface was not inititialized before interrupt")
         }
+        super.onDestroy()
     }
 
 }

@@ -91,6 +91,9 @@ class ConnectionObserver() :Observer() {
             HeaderTypes.ERROR.value -> {
                 Log.e(TAG, "Es gab einen Fehler")
             }
+            HeaderTypes.RADIUS.value ->{
+                Log.i(TAG, "Radius")
+            }
             else -> {
                 Log.e(TAG, "Unknown")
                 pckg.Logpckg()

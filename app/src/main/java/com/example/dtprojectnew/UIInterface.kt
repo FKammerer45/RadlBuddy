@@ -11,9 +11,26 @@
         var Location:String = ""
         var Txt:String = ""
         var Msg:String = ""
+        var Radius:Float = 0f
 
         //TODO allgemein sollte man nen Observer benutzen der das weiterträgt?? damit könnte man z.B. den Text einzeln behandeln
         //TODO füge else Fälle ein...
+        fun set_Radius(rd:Any) {
+            when (rd) {
+                is Float -> {
+                    Radius = rd
+                }
+
+                is Int -> {
+                    Radius = rd.toFloat()
+                }
+
+                is String -> {
+                    Txt = "Radius $rd"
+                    Log.i(TAG, Txt)
+                }
+            }
+        }
         fun set_Speed(spd:Any) {
             when (spd) {
                 is Float -> {
