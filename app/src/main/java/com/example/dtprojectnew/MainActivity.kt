@@ -35,6 +35,8 @@ import androidx.core.app.ActivityCompat
 import com.example.bluetoothtest.MassPermission
 import com.google.android.gms.maps.model.PolylineOptions
 import java.lang.Math.cos
+import java.util.Timer
+import java.util.TimerTask
 import java.util.UUID
 
 data class MonitoredData(
@@ -56,7 +58,7 @@ val Obs:ConnectionObserver = ConnectionObserver()
 //  Der Connect Button sollte auch andersherum funktionieren vielleicht, also für nen Disconnect Sorgen bei erneutem drücken.
 //  Guck dir nochma den ganzen Ablauf an der müsste besser gehen im Sinne von was passiert wenn, wann Buttons gedrückt werden und was dann passieren soll, vielleicht ein paar Alerts mit Infos gut...
 
-class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider {
+class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider, ConnectionStatusObserver {
     lateinit var fnd: BluetoothDevice
     private val mapUpdateRunnable = MapUpdateRunnable(this)
     private lateinit var sharedPreferences: SharedPreferences
@@ -128,27 +130,53 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
         return MonitoredData(UI.Speed, UI.Degree, UI.Bpm, UI.Location)
     }
 
-    fun con_disconwithDevice(){
+
+    private var aliveTimer: Timer? = null
+    private fun startAliveTimer() {
+        val TAG = "Timer"
+        aliveTimer = Timer()
+        aliveTimer?.schedule(object : TimerTask() {
+            override fun run() {
+                Log.i(TAG, "Alive message timeout reached. Disconnecting Device")
+                disconnectDevice()
+            }
+        }, 6000) // 6 Sekunden Timeout
+    }
+    private fun con_disconDevice(){
         val TAG = "con_discnwithDevice"
-        if(::BtInterface.isInitialized && BtInterface.is_connected()){
+        if(::BtInterface.isInitialized && BtInterface.isConnected()){
             Log.i(TAG, "Disconnecting Device")
-            binding.btnConnect.setText("Connect")
             disconnectDevice()
         }
         else{
-            BtInterface = BluetoothInterface()
+            BtInterface = BluetoothInterface(this)
             Log.i(TAG, "Connecting Device")
-            if(ConnectwithDevice())
+            if(connectDevice())
                 binding.btnConnect.setText("Disconnect")
         }
     }
+
+    override fun onConnectionLost() {
+        runOnUiThread {
+            binding.btnLock.text = "Lock" // Setze den Text des Buttons auf "Lock"
+            disconnectDevice()
+        }
+    }
+
     fun disconnectDevice(){
         //Thread interrupten, dort wird das interrupt flag gesetzt, darauf wird auch überprüft
-        val pckg:Package = Package(HeaderTypes.CONNECTED.value)
+        binding.btnConnect.setText("Connect")
+        var pckg:Package = Package(HeaderTypes.CONNECTED.value)
         pckg.intToBytes(0)
         try {BtInterface.send(pckg)}
         catch(e:UninitializedPropertyAccessException){
             Log.e("OnDestroy", "BtInterface was not inititialized couldnt send not connected")
+        }
+        pckg = Package(HeaderTypes.LOCK.value)
+        pckg.intToBytes(1)
+        try {BtInterface.send(pckg)}
+        catch(e:UninitializedPropertyAccessException){
+            Log.e("OnDestroy", "BtInterface was not inititialized couldnt send Close Lock")
         }
         try{BtInterface.interrupt()}
         catch(e:UninitializedPropertyAccessException){
@@ -156,7 +184,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
         }
     }
     @SuppressLint("MissingPermission")
-    fun ConnectwithDevice():Boolean {
+    private fun connectDevice():Boolean {
         Log.v("Main", "You clicked the right Button. There's just one but still good job.")
         val bluetoothManager: BluetoothManager = getSystemService(BluetoothManager::class.java)
 
@@ -190,12 +218,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
                 Manifest.permission.BLUETOOTH, Manifest.permission.ACCESS_FINE_LOCATION)
                 ,1)
 
-            //TODO funktioniert noch nicht richtig
             Bluetooth_Prms.grant_prms()
-            //val LH = Locationhandler(this@MainActivity)
 
-
-            //Log.i("Main","Can get Location ${LH.canGetLocation()}")
             //guckt den Kontext an in dem wir uns befinden und checkt die derzeitigen Permissions
             if (Bluetooth_Prms.check_for_perm(Manifest.permission.BLUETOOTH_ADMIN)
                 && Bluetooth_Prms.check_for_perm(Manifest.permission.BLUETOOTH)
@@ -207,15 +231,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
                     Log.d("Main", "Name " + device.name)
                     Log.d("Main", "MAC  " + device.address)
                 }
-                val searched_adress = "00:22:09:01:02:9E"
-                val wanted = pairedDevices?.find { it.address == searched_adress }
+                val searchedadress = "00:22:09:01:02:9E"
+                val wanted = pairedDevices?.find { it.address == searchedadress }
                 if (wanted != null) {
                     Log.v("Main", "Found Adress " + wanted.address + " with name " + wanted.name)
                     //btn.apply{text = "Connecting..."}
                     val Adpt:BluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
                     val device = Adpt.getRemoteDevice(wanted.address)
 
-                    if(BtInterface.set_Socket(device, UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))){
+                    if(BtInterface.setSocket(device, UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))){
                         //TODO trenn das obere möglichst bald wieder in zwei BtInterface.connect_to_Socket()
                         Obs.addInterface(UI)
                         BtInterface.addObserver(Obs)
@@ -261,7 +285,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
         return false
     }
 
-    fun isLocationEnabled(context: Context): Boolean {
+    private fun isLocationEnabled(context: Context): Boolean {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
                 locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
@@ -283,7 +307,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
                     if(::fnd.isInitialized && fnd != null){
                         //Wenn Gerät gefunden öffne einen Socket zu dem Gerät und starte dann das Interface sollte man abfangen, dass das Gerät
                         //in der Zwischenzeit ausgemacht wurde?? wäre schon irgendwie Schwachsinn das zu tun bzw vielleicht gehen Baterrien leer
-                        if(BtInterface.set_Socket(fnd, UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))){
+                        if(BtInterface.setSocket(fnd, UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))){
                             //TODO trenn das obere möglichst bald wieder in zwei BtInterface.connect_to_Socket()
                             Obs.addInterface(UI)
                             BtInterface.addObserver(Obs)
@@ -451,8 +475,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
         handler.post(updateTextViewsRunnable)
         mapUpdateRunnable.start()
 
-
-
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
 
@@ -516,12 +538,18 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
         }
 
         binding.btnConnect.setOnClickListener{
-            con_disconwithDevice()
+            con_disconDevice()
         }
-
+        // ich glaube 1 ist also lock und 0 müsste open sein glaub ich...
         binding.btnLock.setOnClickListener {
             val pckg:Package = Package(HeaderTypes.LOCK.value)
-            pckg.intToBytes(1)
+
+            if (!UI.Locked)
+                binding.btnLock.setText("Lock")
+            else
+                binding.btnLock.setText("Unlock")
+
+            pckg.intToBytes(if (!UI.Locked) 1 else 0)
             pckg.Logpckg()
             try{BtInterface.send(pckg)}
             catch(e:UninitializedPropertyAccessException){}
@@ -530,7 +558,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
         binding.btnStorageSelection.setOnClickListener {
             val intent = Intent(this, StorageSelection::class.java)
             startActivity(intent)
-
         }
         binding.switchStartStop.setOnCheckedChangeListener { _, isChecked ->
             onSwitchToggled(isChecked)
@@ -554,14 +581,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
         alertDialogBuilder.setTitle("Saved")
         alertDialogBuilder.setItems(profileNames) { _, index ->
             val selectedProfile = profiles[index]
-            Log.i(TAG, "Chosen Profil: ${selectedProfile.name}, ${selectedProfile.value}cm")
+            //Sending that we are connected
+            var pckg:Package = Package(HeaderTypes.CONNECTED.value)
+            pckg.intToBytes(1)
+            try { BtInterface.send(pckg) }
+            catch(e:UninitializedPropertyAccessException){}
 
-            val pckg:Package = Package(HeaderTypes.RADIUS.value)
+            pckg = Package(HeaderTypes.RADIUS.value)
             pckg.floatToBytes(selectedProfile.value, 3)
             pckg.Logpckg()
             try{BtInterface.send(pckg)}
             catch(e:UninitializedPropertyAccessException){}
-
         }
 
         alertDialogBuilder.setPositiveButton("Create Profile") { _, _ ->
@@ -580,10 +610,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
             .setTitle("Create Profile")
             .setPositiveButton("Save") { _, _ ->
                 val profileName = dialogView.findViewById<EditText>(R.id.etProfileName).text.toString()
-                val profileValue = dialogView.findViewById<EditText>(R.id.etProfileValue).text.toString().toFloatOrNull()
+                var profileValue = dialogView.findViewById<EditText>(R.id.etProfileValue).text.toString()
 
-                if (profileName.isNotEmpty() && profileValue != null) {
-                    val profile = Profile(profileName, profileValue)
+                if (profileName.isNotEmpty() && profileValue.isNotEmpty()) {
+                    if(profileValue.indexOf(',') != -1)
+                        profileValue = profileValue.replaceRange(profileValue.indexOf(','), profileValue.indexOf(',') + 1, '.'.toString())
+
+                    val cleanprofileValue = profileValue.toFloat()
+
+                    val profile = Profile(profileName, cleanprofileValue)
                     val profileStorage = ProfileStorage(this)
                     profileStorage.saveProfile(profile)
 
@@ -609,17 +644,22 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
         dialog.show()
     }
 
-
     override fun onDestroy() {
         handler.removeCallbacks(updateTextViewsRunnable)
         mapUpdateRunnable.stop()
         unregisterReceiver(disc)
         //Thread interrupten, dort wird das interrupt flag gesetzt, darauf wird auch überprüft
-        val pckg:Package = Package(HeaderTypes.CONNECTED.value)
+        var pckg:Package = Package(HeaderTypes.CONNECTED.value)
         pckg.intToBytes(0)
         try {BtInterface.send(pckg)}
         catch(e:UninitializedPropertyAccessException){
             Log.e("OnDestroy", "BtInterface was not inititialized couldnt send not connected")
+        }
+        pckg = Package(HeaderTypes.LOCK.value)
+        pckg.intToBytes(1)
+        try {BtInterface.send(pckg)}
+        catch(e:UninitializedPropertyAccessException){
+            Log.e("OnDestroy", "BtInterface was not inititialized couldnt send Close Lock")
         }
         try{BtInterface.interrupt()}
         catch(e:UninitializedPropertyAccessException){
@@ -627,5 +667,4 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider 
         }
         super.onDestroy()
     }
-
 }

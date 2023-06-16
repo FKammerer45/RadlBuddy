@@ -16,29 +16,29 @@ class Package {
     var msglength:UInt = 0u
 
     constructor(Typ:Byte){
-        this.Header[0] = 0xEF.toByte()
+        this.Header[0] = HeaderTypes.START.value
         this.Header[3] = Typ
     }
 
     constructor():this(0.toByte()){}
 
-    private fun set_NgtvBit() {
+    private fun setNgtvBit() {
         // Setze das Negativ-Bit im Header
         this.Header[1] = (this.Header[1].toInt() or 0x02).toByte()
     }
 
-    private fun set_size(size: Byte) {
+    private fun setSize(size: Byte) {
         // Setze die Länge der Nachricht im Header
         this.Header[5] = size
         this.msglength = size.toUInt()
     }
 
-    private fun set_IntSize(size: Byte) {
+    private fun setIntSize(size: Byte) {
         // Setze die Länge der ganzzahligen Bytes im Header
         this.Header[4] = size
     }
 
-    private fun set_FltBit() {
+    private fun setFltBit() {
         // Setze das Nachkomma-Bit im Header
         this.Header[1] = (this.Header[1].toInt() or 0x01).toByte()
     }
@@ -55,13 +55,13 @@ class Package {
             else
                 ((tmpnumintBits / 8) + 1).toByte()
             if (value < 0)
-                set_NgtvBit()
+                setNgtvBit()
         } else {
             numintBytes = 1 // Der Wert ist 0, nur ein Byte wird benötigt
         }
 
-        set_size(numintBytes)
-        set_IntSize(numintBytes)
+        setSize(numintBytes)
+        setIntSize(numintBytes)
 
         this.Msg = ByteArray(numintBytes.toInt())
 
@@ -76,7 +76,7 @@ class Package {
 
         // Ist Kommazahl, setze passendes Bit
         if (precision > 0) {
-            set_FltBit()
+            setFltBit()
         }
 
         intToBytes(intValue)
@@ -105,7 +105,7 @@ class Package {
             newArr[i.toInt()] = (Math.abs(aftPoint) shr (((numaftBytes - (i - msglength) - 1u) * 8u)).toInt() and 0xFF).toByte()
         }
 
-        set_size((msglength + numaftBytes).toByte())
+        setSize((msglength + numaftBytes).toByte())
 
         this.Msg = newArr
     }
@@ -117,7 +117,7 @@ class Package {
         for (i in 0 until this.getIntsize()) {
             result = result shl 8 or (this.Msg[i].toInt() and 0xFF)
         }
-        if(this.is_Ngtv())
+        if(this.isNgtv())
             result *=-1
         return result
     }
@@ -129,11 +129,11 @@ class Package {
 
         if(decSize > 0) {
             var tmpInt:Int = 0
-            for (i in Fltstart until this.getTotalsize().toInt()) {
+            for (i in Fltstart until this.getTotalsize().toInt())
                 tmpInt = tmpInt shl 8 or (this.Msg[i].toInt() and 0xFF)
-            }
+
             Fltpart = tmpInt/10f.pow(tmpInt.toString().count())
-            if(this.is_Ngtv())
+            if(this.isNgtv())
                 Fltpart *=-1
         }
         return decpart.toFloat()+Fltpart
@@ -158,7 +158,7 @@ class Package {
             Log.e(TAG, "Okay das sollte jetzt nicht mehr passieren. Hoffe ich doch...")
         }
     }
-    fun is_Ngtv():Boolean{
+    fun isNgtv():Boolean{
         return (this.Header[1].toInt() and 0x02) != 0
     }
     fun getTotalsize():Short{
@@ -182,34 +182,34 @@ class Package {
         this.Logpckg()
     }
     //TODO hier ist irgendwas mit Reflexion falsch des Weiteren gibt es Reflexion erst seit Android 26 also sowieso blöd
-    fun getInterpreteFunc():()->Any{
-        if(this.is_txt()){
+    fun getInterpretFunc():()->Any{
+        if(this.isTxt()){
             Log.i(TAG, "It is Text")
             return this::combineTxtBytes
         }
-        if(this.is_int()){
+        if(this.isInt()){
             Log.i(TAG, "It is Int")
             return this::combineIntBytesToNumber
         }
-        if(this.is_float()){
+        if(this.isFloat()){
             Log.i(TAG, "It is Float")
             return this::combineFltBytesToNumber
         }
 
         return this::NoFunctionFound
     }
-    fun is_float():Boolean{
+    fun isFloat():Boolean{
         return (this.Header[1].toInt() and 0x01) == 0x01
     }
     //Es ist ein Int wenn es kein float und kein Text ist
-    fun is_int():Boolean{
-        return (!this.is_float() and !this.is_txt())
+    fun isInt():Boolean{
+        return (!this.isFloat() and !this.isTxt())
     }
-    fun is_txt():Boolean{
+    fun isTxt():Boolean{
         return ((this.Header[1].toInt() and 0x04) == 0x04)
     }
-    fun is_msg():Boolean{
-        return ((this.getTyp().toByte() == HeaderTypes.MSG.value) and this.is_txt())
+    fun isMsg():Boolean{
+        return ((this.getTyp().toByte() == HeaderTypes.MSG.value) and this.isTxt())
     }
     fun Logpckg(){
         Log.d(TAG, "Header:")

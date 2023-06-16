@@ -16,7 +16,9 @@ enum class HeaderTypes(val value: Byte) {
     CONNECTED (0xF4.toByte()),
     EXIT (0xF2.toByte()),
     MSG (0xF3.toByte()),
-    ERROR (0xFF.toByte())
+    ERROR (0xFF.toByte()),
+    START (0xEF.toByte()),
+    ALIVE (0xF5.toByte())
 }
 abstract class Observer(){
     abstract fun alert(pckg:Package):Boolean
@@ -35,49 +37,49 @@ class ConnectionObserver() :Observer() {
         UI.remove(UIintf)
     }
     fun test(pckg: Package){
-        if(pckg.is_float())
+        if(pckg.isFloat())
             Log.i(TAG, "Ist ein Float ${pckg.combineFltBytesToNumber()}")
-        if(pckg.is_int())
+        if(pckg.isInt())
             Log.i(TAG,"Ist ein Int ${pckg.combineIntBytesToNumber()}")
-        if(pckg.is_txt())
+        if(pckg.isTxt())
             Log.i(TAG, "Ist ein Txt ${pckg.combineTxtBytes()}")
     }
 
     override fun alert(pckg:Package):Boolean{
         //pckg.Logpckg()
-        val fnct = pckg.getInterpreteFunc()
+        val fnct = pckg.getInterpretFunc()
         when(pckg.getTyp().toByte()){
             HeaderTypes.LOCATION.value ->{
                 Log.i(TAG,"Location")
                 for (k in UI){
-                    k.set_Location(fnct())
+                    k.setLocation(fnct())
                 }
             }
             HeaderTypes.SPEED.value -> {
                 Log.i(TAG, "Geschwindigkeit")
                 for (k in UI){
-                    k.set_Speed(fnct())
+                    k.setSpeed(fnct())
                 }
             }
             HeaderTypes.LOCK.value->{
                 Log.i(TAG, "Lock")
                 for(k in UI)
-                    k.set_Lock(fnct())
+                    k.setLock(fnct())
             }
             HeaderTypes.DEGREE.value -> {
                 Log.i(TAG, "Grad")
                 for (k in UI)
-                    k.set_Degree(fnct())
+                    k.setDegree(fnct())
             }
             HeaderTypes.PULS.value ->{
                 Log.i(TAG,"Puls")
                 for(k in UI)
-                    k.set_Bpm(fnct())
+                    k.setBpm(fnct())
             }
             HeaderTypes.MSG.value ->{
                 Log.i(TAG, "Es ist ein Text")
                 for (k in UI)
-                    k.set_msg(fnct().toString())
+                    k.setmsg(fnct().toString())
             }
             HeaderTypes.STOP.value -> {
                 Log.i (TAG, "Stop")
@@ -93,6 +95,8 @@ class ConnectionObserver() :Observer() {
             }
             HeaderTypes.RADIUS.value ->{
                 Log.i(TAG, "Radius")
+                for (k in UI)
+                    k.setRadius(fnct())
             }
             else -> {
                 Log.e(TAG, "Unknown")

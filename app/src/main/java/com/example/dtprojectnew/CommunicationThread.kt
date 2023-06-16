@@ -3,16 +3,24 @@ package com.example.dtprojectnew
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
+import android.content.Context
 import android.util.Log
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.lang.NullPointerException
 import java.sql.Connection
+import java.util.Timer
+import java.util.TimerTask
 import java.util.UUID
 import kotlin.reflect.typeOf
 
-class BluetoothInterface:Thread() {
+
+interface ConnectionStatusObserver {
+    fun onConnectionLost()
+}
+
+class BluetoothInterface(private val cntxt: MainActivity):Thread() {
 
     private lateinit var mmSckt: BluetoothSocket
     var TAG = "BluetoothInterface"
@@ -22,6 +30,27 @@ class BluetoothInterface:Thread() {
     //private lateinit var hndler: AppInterface
     private var stop_listening = false
 
+    private var connectionStatusObservers: MutableList<ConnectionObserver> = mutableListOf()
+    private var aliveTimer: Timer? = null
+    public fun addObserver(observer: ConnectionObserver) {
+        connectionStatusObservers.add(observer)
+    }
+
+    public fun removeObserver(observer: ConnectionObserver) {
+        connectionStatusObservers.remove(observer)
+    }
+
+    fun startConnectionTimer() {
+        Log.i(TAG, "Wir starten Timer...")
+        aliveTimer?.cancel()
+        aliveTimer = Timer()
+        aliveTimer?.schedule(object : TimerTask() {
+            override fun run() {
+                cntxt.onConnectionLost()
+            }
+        }, 6000)
+    }
+
     private var Observers:MutableList<Observer> = mutableListOf()
     public fun addObserver(Obs:Observer){
         Observers.add(Obs)
@@ -29,7 +58,8 @@ class BluetoothInterface:Thread() {
     public fun removeObserver(Obs:Observer){
         Observers.remove(Obs)
     }
-    public fun is_connected():Boolean{
+
+    public fun isConnected():Boolean{
         if(!::mmSckt.isInitialized)
             return false
         if (mmSckt != null && mmSckt.isConnected)
@@ -38,7 +68,7 @@ class BluetoothInterface:Thread() {
             return false
     }
     @SuppressLint("MissingPermission")
-    public fun set_Socket(fnd: BluetoothDevice, KNOWN_SPP_UUID: UUID):Boolean{
+    public fun setSocket(fnd: BluetoothDevice, KNOWN_SPP_UUID: UUID):Boolean{
         stop_listening = false
         Log.i(TAG,"Trying to open Socket for ${fnd.name} : ${fnd.address} ")
         try {
@@ -46,6 +76,7 @@ class BluetoothInterface:Thread() {
             mmSckt?.let { BluetoothSocket -> BluetoothSocket.connect() }
             Inpt = mmSckt.inputStream
             Outpt = mmSckt.outputStream
+            startConnectionTimer()
         }
         catch (e: IOException){
             //Wird z.B. ausgelöst wenn das Gerät dann entfernt wird, ausgeht oder es bereits eine Verbindung und eine Kommunikation gibt.
@@ -57,6 +88,7 @@ class BluetoothInterface:Thread() {
                 mmSckt?.let { BluetoothSocket -> BluetoothSocket.connect() }
                 Inpt = mmSckt.inputStream
                 Outpt = mmSckt.outputStream
+                startConnectionTimer()
             }
             catch (e: IOException){
                 Log.e(TAG,"Still couldnt create Socket",e)
@@ -67,7 +99,7 @@ class BluetoothInterface:Thread() {
     }
 
     //TODO überleg mal warum das in zwei Funktionen nich läuft aber in einer aufeinmal schon...
-    public fun connect_to_Socket():Boolean{
+    public fun connectSocket():Boolean{
         try {
             mmSckt?.let { BluetoothSocket -> BluetoothSocket.connect() }
             Inpt = mmSckt.inputStream
@@ -106,14 +138,14 @@ class BluetoothInterface:Thread() {
             while(!stop_listening && !currentThread().isInterrupted){
                 //Log.i(TAG, "Current available Inpt ${Inpt.available()}")
 
-//					  additional information
+//					         additional information
 //Package:|   0xEF   | 0 0 0   0       0           0      |  0x00  |  0x00 |         0x00         |  0x00     |     ...
 //		  |Startbyte |       Text   Negativ     Kommazahl | Msg-ID |   Typ |  Anzahl der Ganzzahl |  Länge    |     Msg
 //		  |			 |								      |	       |       |        Packages      | der Msg   |
                 if(Inpt.available()>=6){
-                    val StartCommByte = Inpt.read().toByte()
-                    if(StartCommByte != 0xEF.toByte()){
-                        Log.e(TAG, "Unallowed Start comm-byte $StartCommByte, ${"0x"+(StartCommByte.toInt() and 0xFF).toUInt().toString(16)}")
+                    val startCommByte = Inpt.read().toByte()
+                    if(startCommByte != HeaderTypes.START.value){
+                        Log.e(TAG, "Unallowed Start comm-byte $startCommByte, ${"0x"+(startCommByte.toInt() and 0xFF).toUInt().toString(16)}")
                         continue
                     }
                     Log.i(TAG, "Got Message")
@@ -126,17 +158,26 @@ class BluetoothInterface:Thread() {
                     pckg.BytetoHeadercpy(header)
 
                     var buffer = ByteArray(pckg.getTotalsize().toInt())
-                    var curr_bytes:Int = 0
+                    var currBytes:Int = 0
 
                     Log.i(TAG, "Msg Length is ${pckg.getTotalsize()}")
                     //Lies immer nur ein Byte mach mal das es mehere gleichzeitig liest.
-                    while(curr_bytes < pckg.getTotalsize()){
-                        buffer[curr_bytes] = Inpt.read().toByte()
-                        curr_bytes++
+                    while(currBytes < pckg.getTotalsize()){
+                        buffer[currBytes] = Inpt.read().toByte()
+                        currBytes++
                     }
                     pckg.BytetoMsgcpy(buffer)
                     pckg.Logpckg()
-                    this.alertObservers(pckg)
+
+                    //Spezial Fall ist ne Alive Message, nicht für UI gedacht...
+                    if (pckg.getTyp().toByte() == HeaderTypes.ALIVE.value){
+                        this.send(pckg)
+                        Log.i(TAG, "Ladies n Gentelman we've gottem")
+                        this.startConnectionTimer()
+                    }
+
+                    else
+                        this.alertObservers(pckg)
                 }
             }
         }

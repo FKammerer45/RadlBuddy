@@ -7,7 +7,7 @@
         var Speed:Float = 0f
         var Degree:Float = 0f
         var Bpm:Int = 0
-        var Lock:Boolean = false
+        var Locked:Boolean = true
         var Location:String = ""
         var Txt:String = ""
         var Msg:String = ""
@@ -15,7 +15,7 @@
 
         //TODO allgemein sollte man nen Observer benutzen der das weiterträgt?? damit könnte man z.B. den Text einzeln behandeln
         //TODO füge else Fälle ein...
-        fun set_Radius(rd:Any) {
+        fun setRadius(rd:Any) {
             when (rd) {
                 is Float -> {
                     Radius = rd
@@ -31,7 +31,7 @@
                 }
             }
         }
-        fun set_Speed(spd:Any) {
+        fun setSpeed(spd:Any) {
             when (spd) {
                 is Float -> {
                     Speed = spd
@@ -47,7 +47,7 @@
                 }
             }
         }
-        fun set_Location(location:Any){
+        fun setLocation(location:Any){
             when(location){
                 is String->{
                     Location = location
@@ -57,19 +57,19 @@
                 }
             }
         }
-        fun set_Lock(lck:Any){
+        fun setLock(lck:Any){
             when(lck){
                 is Int->{
-                if(lck == 0x00)
-                    Lock = false
-                else
-                    Lock = true
+                    if(lck == 0x00)
+                        Locked = false
+                    else
+                        Locked = true
                 }
                 else ->
                     Log.e(TAG, "Non allowed Type for Lock, $lck")
             }
         }
-        fun set_Degree(dgr:Any){
+        fun setDegree(dgr:Any){
             when(dgr){
                 is Float->{
                     Degree = dgr
@@ -83,7 +83,7 @@
                 }
             }
         }
-        fun set_Bpm(bpm:Any){
+        fun setBpm(bpm:Any){
             when(bpm){
                 is Float->{
                     Bpm = bpm.toInt()
@@ -97,7 +97,7 @@
                 }
             }
         }
-        fun set_msg(msg:String){
+        fun setmsg(msg:String){
             Msg = msg
             Log.i(TAG,msg)
         }
@@ -109,7 +109,7 @@
             Log.i(TAG,"Bpm: $Bpm")
             Log.i(TAG,"Txt: $Txt")
             Log.i(TAG,"Msg: $Msg")
-            Log.i(TAG, "Lock: $Lock")
+            Log.i(TAG, "Lock: $Locked")
             Log.i(TAG, "GPS Location. $Location" )
         }
     }
