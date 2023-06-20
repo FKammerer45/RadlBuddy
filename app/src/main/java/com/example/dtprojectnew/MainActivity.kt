@@ -29,8 +29,10 @@ import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.location.Criteria
 import android.location.LocationManager
 import android.nfc.Tag
+import android.widget.ImageView
 import androidx.core.app.ActivityCompat
 import com.example.bluetoothtest.MassPermission
 import com.google.android.gms.maps.model.PolylineOptions
@@ -38,6 +40,10 @@ import java.lang.Math.cos
 import java.util.Timer
 import java.util.TimerTask
 import java.util.UUID
+import android.location.Location
+import android.location.LocationListener
+
+
 
 data class MonitoredData(
     val speed: Float,
@@ -50,7 +56,7 @@ lateinit var BtInterface:BluetoothInterface
 
 val UI:UIInterface = UIInterface()
 val Obs:ConnectionObserver = ConnectionObserver()
-
+var phonelocation = ""
 
 
 //TODO Samir:
@@ -59,6 +65,7 @@ val Obs:ConnectionObserver = ConnectionObserver()
 //  Guck dir nochma den ganzen Ablauf an der müsste besser gehen im Sinne von was passiert wenn, wann Buttons gedrückt werden und was dann passieren soll, vielleicht ein paar Alerts mit Infos gut...
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider, ConnectionStatusObserver {
+
     lateinit var fnd: BluetoothDevice
     private val mapUpdateRunnable = MapUpdateRunnable(this)
     private lateinit var sharedPreferences: SharedPreferences
@@ -66,6 +73,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
     private val recordedData = mutableListOf<MonitoredData>()
     private var isRecording = false
     private lateinit var mMap: GoogleMap
+
+    //reference to the image view "arrow"
+    private lateinit var arrowImageView: ImageView
+
 
     private var samplelocation: String = "48.76508,11.42372"
     private val path: MutableList<LatLng> = mutableListOf()
@@ -97,6 +108,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
         // Draw the updated path
         drawPath()
     }
+
+    //sets tilt of arrowIV
+    fun setTilt(degrees: Float) {
+        arrowImageView.rotation = degrees
+    }
+
     private fun clearMap() {
         if(::mMap.isInitialized) {
             mMap.clear() // Clear the entire map
@@ -125,9 +142,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
     // Declare the variable
     private lateinit var mapUpdateProvider: MapUpdateProvider
     override fun getDataFromSensors(): MonitoredData {
-        //return MonitoredData(UI.Speed, UI.Degree, UI.Bpm, UI.Location)
+        // data from sensors
+        // return MonitoredData(UI.Speed, UI.Degree, UI.Bpm, UI.Location)
 
-        return MonitoredData(UI.Speed, UI.Degree, UI.Bpm, UI.Location)
+        //some data from phone
+        //Log.d("MyApp", "Speed: ${UI.Speed}, Degree: ${UI.Degree}, BPM: ${UI.Bpm}, Location: $phonelocation")
+        return MonitoredData(UI.Speed, UI.Degree, UI.Bpm, phonelocation)
+
+
     }
 
 
@@ -363,6 +385,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
     private val updateTextViewsRunnable = object : Runnable {
         override fun run() {
             updateTextViews()
+            setTilt(45f) // This will tilt the arrow 45 degrees
             handler.postDelayed(this, 500) // Update text views every 100 ms (1 second)
         }
     }
@@ -466,6 +489,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
             //moveNorthAndEast()
         }
     }
+    private val LOCATION_REQUEST_CODE = 101
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -474,6 +498,65 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
         sharedPreferences = getSharedPreferences("appData", MODE_PRIVATE)
         handler.post(updateTextViewsRunnable)
         mapUpdateRunnable.start()
+        arrowImageView = binding.ivTilt
+
+        // get location data from phone
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ),
+                LOCATION_REQUEST_CODE
+            )
+        }
+
+
+        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+        val locationListener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                // use the location object which contains latitude and longitude
+                val latLng = "${location.latitude},${location.longitude}"
+                phonelocation = latLng
+                Log.d("LocationUpdate", "phonelocation: $phonelocation")
+
+            }
+
+            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {
+                // You can safely ignore this for now
+            }
+
+            override fun onProviderEnabled(provider: String) {
+                // You can safely ignore this for now
+            }
+
+            override fun onProviderDisabled(provider: String) {
+                // You can safely ignore this for now
+            }
+        }
+
+
+
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED || ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0L, 0f, locationListener)
+        }
+        //end of taking location from phone
 
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment

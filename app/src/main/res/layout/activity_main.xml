@@ -8,9 +8,7 @@
     android:layout_height="match_parent"
     android:background="#36393F"
     tools:context=".MainActivity">
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+<LinearLayout
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -159,18 +157,35 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Height"
+                    android:text="Tilt"
                     android:textSize="18sp"
                     android:textColor="#FFFFFF"
                     android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tv_height"
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                    <TextView
+                    android:id="@+id/tvHeight"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="0.0"
-                    android:textSize="24sp"
-                    android:textColor="#FFFFFF" />
+                    android:layout_marginEnd="8dp"
+                    android:text="10"
+                    android:textColor="#FFFFFF"
+                    android:textSize="24sp" />
+
+
+                    <ImageView
+                    android:id="@+id/iv_tilt"
+                    android:layout_width="50dp"
+                    android:layout_height="35dp"
+                    android:src="@drawable/ic_arrow" />
+            </LinearLayout>
+
+
+
 
             </LinearLayout>
 
