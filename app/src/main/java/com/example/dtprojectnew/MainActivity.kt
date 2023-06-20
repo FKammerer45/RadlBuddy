@@ -647,7 +647,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
     override fun onDestroy() {
         handler.removeCallbacks(updateTextViewsRunnable)
         mapUpdateRunnable.stop()
-        unregisterReceiver(disc)
+        try {
+            unregisterReceiver(disc)
+        } catch (e: IllegalArgumentException) {
+            // Receiver was not registered, ignore
+        }
+
         //Thread interrupten, dort wird das interrupt flag gesetzt, darauf wird auch überprüft
         var pckg:Package = Package(HeaderTypes.CONNECTED.value)
         pckg.intToBytes(0)
