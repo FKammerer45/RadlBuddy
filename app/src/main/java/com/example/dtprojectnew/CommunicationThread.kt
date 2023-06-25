@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.content.Context
+import android.preference.PreferenceActivity.Header
 import android.util.Log
 import java.io.IOException
 import java.io.InputStream
@@ -21,7 +22,7 @@ interface ConnectionStatusObserver {
 }
 
 class BluetoothInterface(private val cntxt: MainActivity):Thread() {
-
+    var k:Float = -10f
     private lateinit var mmSckt: BluetoothSocket
     var TAG = "BluetoothInterface"
     private var stop_sending = false
@@ -30,17 +31,9 @@ class BluetoothInterface(private val cntxt: MainActivity):Thread() {
     //private lateinit var hndler: AppInterface
     private var stop_listening = false
 
-    private var connectionStatusObservers: MutableList<ConnectionObserver> = mutableListOf()
     private var aliveTimer: Timer? = null
-    public fun addObserver(observer: ConnectionObserver) {
-        connectionStatusObservers.add(observer)
-    }
 
-    public fun removeObserver(observer: ConnectionObserver) {
-        connectionStatusObservers.remove(observer)
-    }
-
-    fun startConnectionTimer() {
+    fun startConnectionTimer(time:Long) {
         Log.i(TAG, "Wir starten Timer...")
         aliveTimer?.cancel()
         aliveTimer = Timer()
@@ -48,7 +41,7 @@ class BluetoothInterface(private val cntxt: MainActivity):Thread() {
             override fun run() {
                 cntxt.onConnectionLost()
             }
-        }, 6000)
+        }, time)
     }
 
     private var Observers:MutableList<Observer> = mutableListOf()
@@ -68,6 +61,7 @@ class BluetoothInterface(private val cntxt: MainActivity):Thread() {
             return false
     }
     @SuppressLint("MissingPermission")
+    //Startet derzeit einen Timer mit 3Minuten, so viel zeit hat man um ein Profil auszuwählen oder zu erstellen, ohne nochma connecten zu müssen
     public fun setSocket(fnd: BluetoothDevice, KNOWN_SPP_UUID: UUID):Boolean{
         stop_listening = false
         Log.i(TAG,"Trying to open Socket for ${fnd.name} : ${fnd.address} ")
@@ -76,7 +70,7 @@ class BluetoothInterface(private val cntxt: MainActivity):Thread() {
             mmSckt?.let { BluetoothSocket -> BluetoothSocket.connect() }
             Inpt = mmSckt.inputStream
             Outpt = mmSckt.outputStream
-            startConnectionTimer()
+            startConnectionTimer(200000)
         }
         catch (e: IOException){
             //Wird z.B. ausgelöst wenn das Gerät dann entfernt wird, ausgeht oder es bereits eine Verbindung und eine Kommunikation gibt.
@@ -88,7 +82,7 @@ class BluetoothInterface(private val cntxt: MainActivity):Thread() {
                 mmSckt?.let { BluetoothSocket -> BluetoothSocket.connect() }
                 Inpt = mmSckt.inputStream
                 Outpt = mmSckt.outputStream
-                startConnectionTimer()
+                startConnectionTimer(200000)
             }
             catch (e: IOException){
                 Log.e(TAG,"Still couldnt create Socket",e)
@@ -115,12 +109,16 @@ class BluetoothInterface(private val cntxt: MainActivity):Thread() {
     public fun send(pckg:Package){
         Log.i(TAG, "Sending this Package")
         pckg.Logpckg()
-        Outpt.write(pckg.Header)
-        Outpt.write(pckg.Msg)
+        try{
+            Outpt.write(pckg.Header)
+            Outpt.write(pckg.Msg)
+        }
+        catch(e:java.io.IOException){}
     }
 
     private fun alertObservers(pckg:Package){
         for(k in this.Observers){
+
             when(k){
                 is ConnectionObserver->{
                     k.alert(pckg)
@@ -171,13 +169,17 @@ class BluetoothInterface(private val cntxt: MainActivity):Thread() {
 
                     //Spezial Fall ist ne Alive Message, nicht für UI gedacht...
                     if (pckg.getTyp().toByte() == HeaderTypes.ALIVE.value){
-                        this.send(pckg)
-                        Log.i(TAG, "Ladies n Gentelman we've gottem")
-                        this.startConnectionTimer()
+                        try{
+                            this.send(pckg)
+                            Log.i(TAG, "Ladies n Gentelman we've gottem")
+                            this.startConnectionTimer(6000)
+                        }
+                        catch(e:java.io.IOException){}
                     }
-
-                    else
+                    else{
+                        Log.i(TAG, "Wir haben ein normales Package bekommen")
                         this.alertObservers(pckg)
+                    }
                 }
             }
         }

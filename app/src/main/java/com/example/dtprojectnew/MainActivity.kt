@@ -50,6 +50,7 @@ data class MonitoredData(
     val height: Float,
     val pulse: Int,
     val location: String,
+    val temperatur: Float,
     val pathM: MutableList<LatLng> = mutableListOf()
 )
 lateinit var BtInterface:BluetoothInterface
@@ -73,6 +74,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
     private val recordedData = mutableListOf<MonitoredData>()
     private var isRecording = false
     private lateinit var mMap: GoogleMap
+    private lateinit var thermometerView: ThermometerView
 
     //reference to the image view "arrow"
     private lateinit var arrowImageView: ImageView
@@ -147,23 +149,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
 
         //some data from phone
         //Log.d("MyApp", "Speed: ${UI.Speed}, Degree: ${UI.Degree}, BPM: ${UI.Bpm}, Location: $phonelocation")
-        return MonitoredData(UI.Speed, UI.Degree, UI.Bpm, phonelocation)
+        return MonitoredData(UI.Speed, UI.Degree, UI.Bpm, phonelocation, UI.Temperature)
 
 
     }
 
-
-    private var aliveTimer: Timer? = null
-    private fun startAliveTimer() {
-        val TAG = "Timer"
-        aliveTimer = Timer()
-        aliveTimer?.schedule(object : TimerTask() {
-            override fun run() {
-                Log.i(TAG, "Alive message timeout reached. Disconnecting Device")
-                disconnectDevice()
-            }
-        }, 6000) // 6 Sekunden Timeout
-    }
     private fun con_disconDevice(){
         val TAG = "con_discnwithDevice"
         if(::BtInterface.isInitialized && BtInterface.isConnected()){
@@ -180,8 +170,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
 
     override fun onConnectionLost() {
         runOnUiThread {
-            binding.btnLock.text = "Lock" // Setze den Text des Buttons auf "Lock"
-            disconnectDevice()
+            if(::BtInterface.isInitialized && BtInterface.isConnected()){
+                binding.btnLock.text = "Lock" // Setze den Text des Buttons auf "Lock"
+                Log.i("onConnectionLost", "Disconnecting Device")
+                disconnectDevice()
+            }
         }
     }
 
@@ -192,17 +185,24 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
         pckg.intToBytes(0)
         try {BtInterface.send(pckg)}
         catch(e:UninitializedPropertyAccessException){
-            Log.e("OnDestroy", "BtInterface was not inititialized couldnt send not connected")
+            Log.e("disconnectDevice", "BtInterface was not inititialized couldnt send not connected")
         }
         pckg = Package(HeaderTypes.LOCK.value)
         pckg.intToBytes(1)
-        try {BtInterface.send(pckg)}
-        catch(e:UninitializedPropertyAccessException){
-            Log.e("OnDestroy", "BtInterface was not inititialized couldnt send Close Lock")
+        try {
+            BtInterface.send(pckg)
+            if (UI.Locked)
+                binding.btnLock.setText("Lock")
+            else
+                binding.btnLock.setText("Unlock")
         }
+        catch(e:UninitializedPropertyAccessException){
+            Log.e("disconnectDevice", "BtInterface was not inititialized couldnt send Close Lock")
+        }
+
         try{BtInterface.interrupt()}
         catch(e:UninitializedPropertyAccessException){
-            Log.e("OnDestroy", "BtInterface was not inititialized before interrupt")
+            Log.e("disconnectDevice", "BtInterface was not inititialized before interrupt")
         }
     }
     @SuppressLint("MissingPermission")
@@ -398,6 +398,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
         binding.tvPulse.text = "${data.pulse}"
         binding.tvLocation.text = "${data.location}"
         updateLocationOnMap(data.location)
+        thermometerView.setTemperature(data.temperatur)
     }
 
     private fun startMonitoringData() {
@@ -499,6 +500,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
         handler.post(updateTextViewsRunnable)
         mapUpdateRunnable.start()
         arrowImageView = binding.ivTilt
+        thermometerView = binding.thermometerView
+
 
         // get location data from phone
         if (ActivityCompat.checkSelfPermission(
@@ -675,6 +678,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
             pckg.Logpckg()
             try{BtInterface.send(pckg)}
             catch(e:UninitializedPropertyAccessException){}
+
+            BtInterface.startConnectionTimer(10000)
         }
 
         alertDialogBuilder.setPositiveButton("Create Profile") { _, _ ->
@@ -718,6 +723,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
                     try{BtInterface.send(pckg)}
                     catch(e:UninitializedPropertyAccessException){}
 
+                    BtInterface.startConnectionTimer(10000)
                 }
             }
             .setNegativeButton("Abort", null)

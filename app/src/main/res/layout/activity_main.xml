@@ -17,7 +17,6 @@
     tools:context=".MainActivity">
 
 
-
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -161,7 +160,8 @@
                     android:textSize="18sp"
                     android:textColor="#FFFFFF"
                     android:textStyle="bold" />
-            <LinearLayout
+
+                <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="start"
@@ -250,6 +250,13 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
 
+            <com.example.dtprojectnew.ThermometerView
+                android:id="@+id/thermometerView"
+                android:layout_width="72dp"
+                android:layout_height="135dp"
+                android:layout_marginTop="1dp"
+                android:layout_marginLeft="310dp"/>
+
         </FrameLayout>
 
     </androidx.cardview.widget.CardView>
@@ -279,7 +286,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="LOCK"
+        android:text="UNLOCK"
         android:backgroundTint="#7289DA"
         android:layout_gravity="center_horizontal"
         android:textColor="#FFFFFF" />

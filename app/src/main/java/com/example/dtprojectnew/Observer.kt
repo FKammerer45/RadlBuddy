@@ -8,9 +8,10 @@ enum class HeaderTypes(val value: Byte) {
     SPEED (0x01.toByte()),
     DEGREE (0x02.toByte()),
     PULS (0x03.toByte()),
-    LOCK (0x05.toByte()),
     LOCATION (0x04.toByte()),
+    LOCK (0x05.toByte()),
     RADIUS (0x06.toByte()),
+    TEMPERATURE (0x07.toByte()),
     STOP (0xF0.toByte()),
     CONTINUE (0xF1.toByte()),
     CONNECTED (0xF4.toByte()),
@@ -97,6 +98,11 @@ class ConnectionObserver() :Observer() {
                 Log.i(TAG, "Radius")
                 for (k in UI)
                     k.setRadius(fnct())
+            }
+            HeaderTypes.TEMPERATURE.value ->{
+                Log.i(TAG, "Temperatur")
+                for (k in UI)
+                    k.setTemp(fnct())
             }
             else -> {
                 Log.e(TAG, "Unknown")
