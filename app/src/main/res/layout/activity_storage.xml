@@ -42,6 +42,23 @@
                 android:textSize="18sp"
                 android:layout_marginTop="16dp" />
 
+            <TextView
+                android:id="@+id/tv_temperature_stats"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Temperature: Min / Max / Avg"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:layout_marginTop="16dp"/>
+            <TextView
+                android:id="@+id/tv_tilt_stats"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Pitch/Tilt: Min / Max / Avg"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:layout_marginTop="16dp"/>
+
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 

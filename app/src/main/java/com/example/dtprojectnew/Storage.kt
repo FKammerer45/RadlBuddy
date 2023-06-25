@@ -17,7 +17,7 @@ import com.google.gson.reflect.TypeToken
 private lateinit var binding: ActivityStorageBinding
 
 
-data class Data(val speed: Double, val height: Double, val pulse: Int, val location: String)
+data class Data(val speed: Double, val height: Double, val pulse: Int, val location: String, val temperature: Double, val tilt: Double)
 data class Stats(val min: Double, val max: Double, val avg: Double)
 
 class Storage : AppCompatActivity() {
@@ -37,6 +37,8 @@ class Storage : AppCompatActivity() {
         val speedValues = dataList.map { it.speed }
         val pulseValues = dataList.map { it.pulse.toDouble() }
         val locationValues = dataList.map { it.location }
+        val temperatureValues = dataList.map { it.temperature }
+        val tiltValues = dataList.map { it.tilt }
         val parsedLocations = locationValues.map {
             val split = it.split(",")
             LatLng(split[0].toDouble(), split[1].toDouble())
@@ -44,11 +46,13 @@ class Storage : AppCompatActivity() {
 
         val speedStats = calculateStats(speedValues)
         val pulseStats = calculateStats(pulseValues)
+        val temperatureStats = calculateStats(temperatureValues)
+        val tiltStats = calculateStats(tiltValues)
 
         binding.tvSpeedStats.text = "Speed: Min ${speedStats.min} / Max ${speedStats.max} / Avg ${speedStats.avg}"
         binding.tvPulseStats.text = "Pulse: Min ${pulseStats.min} / Max ${pulseStats.max} / Avg ${pulseStats.avg}"
-
-
+        binding.tvTemperatureStats.text = "Temperature: Min ${temperatureStats.min} / Max ${temperatureStats.max} / Avg ${temperatureStats.avg}"
+        binding.tvTiltStats.text = "Pitch/Tilt: Min ${tiltStats.min} / Max ${tiltStats.max} / Avg ${tiltStats.avg}"
 
         mapFragment.getMapAsync { googleMap ->
             // Save a reference to the map for later use
