@@ -29,16 +29,12 @@ import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.location.Criteria
 import android.location.LocationManager
-import android.nfc.Tag
 import android.widget.ImageView
 import androidx.core.app.ActivityCompat
 import com.example.bluetoothtest.MassPermission
 import com.google.android.gms.maps.model.PolylineOptions
 import java.lang.Math.cos
-import java.util.Timer
-import java.util.TimerTask
 import java.util.UUID
 import android.location.Location
 import android.location.LocationListener
@@ -47,10 +43,10 @@ import android.location.LocationListener
 
 data class MonitoredData(
     val speed: Float,
-    val height: Float,
+    val tilt: Float,
     val pulse: Int,
     val location: String,
-    val temperatur: Float,
+    val temperature: Float,
     val pathM: MutableList<LatLng> = mutableListOf()
 )
 lateinit var BtInterface:BluetoothInterface
@@ -385,20 +381,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
     private val updateTextViewsRunnable = object : Runnable {
         override fun run() {
             updateTextViews()
-            setTilt(45f) // This will tilt the arrow 45 degrees
+
             handler.postDelayed(this, 500) // Update text views every 100 ms (1 second)
         }
     }
 
     private fun updateTextViews() {
         val data = getDataFromSensors()
-
+        setTilt(data.tilt) //
         binding.tvSpeed.text = "${data.speed}"
-        binding.tvHeight.text = "${data.height}"
+        binding.tvTilt.text = "${data.tilt}"
         binding.tvPulse.text = "${data.pulse}"
-        binding.tvLocation.text = "${data.location}"
+        binding.tvTemperature.text = "${data.temperature}"
         updateLocationOnMap(data.location)
-        thermometerView.setTemperature(data.temperatur)
+        thermometerView.setTemperature(data.temperature)
     }
 
     private fun startMonitoringData() {
