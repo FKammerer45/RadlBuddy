@@ -17,22 +17,9 @@
     tools:context=".MainActivity">
 
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Radl Buddy"
-        android:textSize="32sp"
-        android:textColor="#FFFFFF"
-        android:textStyle="bold"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="16dp" />
 
-    <TextView
-        android:id="@+id/tvProfileNames"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="18sp"
-        android:padding="16dp" />
+
+
 
 
     <LinearLayout
