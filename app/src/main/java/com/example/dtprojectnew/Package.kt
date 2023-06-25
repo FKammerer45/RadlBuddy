@@ -7,6 +7,7 @@ package com.example.dtprojectnew
 //		  |			 |								      |	       |       |        Packages      | der Msg   |
 
 import android.util.Log
+import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlin.math.pow
 //VERALTET!!!!!!
 class Package {
@@ -14,6 +15,8 @@ class Package {
     var Header:ByteArray = ByteArray(6)
     lateinit var Msg:ByteArray
     var msglength:UInt = 0u
+    val GEN_POLYNOM: UByte = 0x3Du.toUByte()
+    var CRC:UByte = 0u
 
     constructor(Typ:Byte){
         this.Header[0] = HeaderTypes.START.value
@@ -219,5 +222,45 @@ class Package {
         for(byte in Msg)
             Log.d(TAG,byte.toUByte().toString(2).padStart(8, '0'))
 
+    }
+
+    fun calculateCRC(): UByte {
+        var crc: UByte = 0u
+
+        // Überspringe das SFD
+        for (i in 1 until 6) {
+            crc = crc xor this.Header[i].toUByte()
+
+            for (j in 0 until 8) {
+                if ((crc.toInt() and 0x80) != 0) {
+                    crc = ((crc.toInt() shl 1) xor GEN_POLYNOM.toInt()).toUByte()
+                } else {
+                    crc = (crc.toInt() shl 1).toUByte()
+                }
+            }
+        }
+
+        crc = crc xor this.msglength.toUByte()
+
+        for (i in 0u until this.msglength) {
+            crc = crc xor this.Msg[i.toInt()].toUByte()
+
+            for (j in 0 until 8) {
+                if ((crc.toInt() and 0x80) != 0) {
+                    crc = ((crc.toInt() shl 1) xor GEN_POLYNOM.toInt()).toUByte()
+                } else {
+                    crc = (crc.toInt() shl 1).toUByte()
+                }
+            }
+        }
+
+        println("\n\nBerechnete CRC: $crc\n\n")
+        return crc
+    }
+    fun makeCRC(){
+        this.CRC = this.calculateCRC()
+    }
+    fun checkCRC():Boolean{
+        return this.CRC == this.calculateCRC()
     }
 }

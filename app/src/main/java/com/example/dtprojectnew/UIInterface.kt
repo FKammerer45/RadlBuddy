@@ -12,9 +12,26 @@
         var Txt:String = ""
         var Msg:String = ""
         var Radius:Float = 0f
+        var Temperature:Float = 0f
 
         //TODO allgemein sollte man nen Observer benutzen der das weiterträgt?? damit könnte man z.B. den Text einzeln behandeln
         //TODO füge else Fälle ein...
+        fun setTemp(tmp:Any){
+            when (tmp) {
+                is Float -> {
+                    Temperature = tmp
+                }
+
+                is Int -> {
+                    Temperature = tmp.toFloat()
+                }
+
+                is String -> {
+                    Txt = "Radius $tmp"
+                    Log.i(TAG, Txt)
+                }
+            }
+        }
         fun setRadius(rd:Any) {
             when (rd) {
                 is Float -> {
