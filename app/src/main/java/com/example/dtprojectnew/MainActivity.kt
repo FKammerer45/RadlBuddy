@@ -29,9 +29,7 @@ import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.location.Criteria
 import android.location.LocationManager
-import android.nfc.Tag
 import android.widget.ImageView
 import androidx.core.app.ActivityCompat
 import com.example.bluetoothtest.MassPermission
@@ -47,7 +45,7 @@ import android.location.LocationListener
 
 data class MonitoredData(
     val speed: Float,
-    val height: Float,
+    val tilt: Float,
     val pulse: Int,
     val location: String,
     val pathM: MutableList<LatLng> = mutableListOf()
@@ -73,7 +71,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
     private val recordedData = mutableListOf<MonitoredData>()
     private var isRecording = false
     private lateinit var mMap: GoogleMap
-
+    private var tilt = -180.0
     //reference to the image view "arrow"
     private lateinit var arrowImageView: ImageView
 
@@ -110,7 +108,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
     }
 
     //sets tilt of arrowIV
-    fun setTilt(degrees: Float) {
+    private fun setTilt(degrees: Float) {
         arrowImageView.rotation = degrees
     }
 
@@ -147,7 +145,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
 
         //some data from phone
         //Log.d("MyApp", "Speed: ${UI.Speed}, Degree: ${UI.Degree}, BPM: ${UI.Bpm}, Location: $phonelocation")
-        return MonitoredData(UI.Speed, UI.Degree, UI.Bpm, phonelocation)
+        tilt++
+        return MonitoredData(UI.Speed, tilt.toFloat(), UI.Bpm, phonelocation)
 
 
     }
@@ -385,7 +384,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
     private val updateTextViewsRunnable = object : Runnable {
         override fun run() {
             updateTextViews()
-            setTilt(45f) // This will tilt the arrow 45 degrees
+
             handler.postDelayed(this, 500) // Update text views every 100 ms (1 second)
         }
     }
@@ -394,9 +393,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
         val data = getDataFromSensors()
 
         binding.tvSpeed.text = "${data.speed}"
-        binding.tvHeight.text = "${data.height}"
+        binding.tvTilt.text = String.format("%+04.0f", data.tilt)
         binding.tvPulse.text = "${data.pulse}"
-        binding.tvLocation.text = "${data.location}"
+        //binding.tvLocation.text = "${data.location}"
+        setTilt(-1*data.tilt)
         updateLocationOnMap(data.location)
     }
 
