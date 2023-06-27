@@ -47,6 +47,7 @@ data class MonitoredData(
     val pulse: Int,
     val location: String,
     val temperature: Float,
+    val Distance: Int,
     val pathM: MutableList<LatLng> = mutableListOf()
 )
 lateinit var BtInterface:BluetoothInterface
@@ -54,7 +55,7 @@ lateinit var BtInterface:BluetoothInterface
 val UI:UIInterface = UIInterface()
 val Obs:ConnectionObserver = ConnectionObserver()
 var phonelocation = ""
-
+var distCounter:Int = 0
 
 //TODO Samir:
 //  Das ding schmiert ab und an mal ab weil es irgendwie den Socket nich richtig createn kann.
@@ -145,9 +146,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
 
         //some data from phone
         //Log.d("MyApp", "Speed: ${UI.Speed}, Degree: ${UI.Degree}, BPM: ${UI.Bpm}, Location: $phonelocation")
-        return MonitoredData(UI.Speed, UI.Degree, UI.Bpm, phonelocation, UI.Temperature)
-
-
+        return MonitoredData(UI.Speed, UI.Degree, UI.Bpm, phonelocation, UI.Temperature, UI.Distance)
     }
 
     private fun con_disconDevice(){
@@ -187,10 +186,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
         pckg.intToBytes(1)
         try {
             BtInterface.send(pckg)
-            if (UI.Locked)
-                binding.btnLock.setText("Lock")
-            else
-                binding.btnLock.setText("Unlock")
+            binding.btnLock.setText("Unlock")
         }
         catch(e:UninitializedPropertyAccessException){
             Log.e("disconnectDevice", "BtInterface was not inititialized couldnt send Close Lock")
@@ -250,6 +246,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
                     Log.d("Main", "MAC  " + device.address)
                 }
                 val searchedadress = "00:22:09:01:02:9E"
+                //val searchedadress = "00:14:03:02:09:42"
                 val wanted = pairedDevices?.find { it.address == searchedadress }
                 if (wanted != null) {
                     Log.v("Main", "Found Adress " + wanted.address + " with name " + wanted.name)
@@ -359,6 +356,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
                                 return
                             }
                             Log.d(TAG,"${device.name} ${device.address}")
+                            //"00:14:03:02:09:42"
+
                             if(device.address == "00:22:09:01:02:9E"){
                                 fnd = device
                                 Log.d(TAG, "Found the Device")
@@ -394,6 +393,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
         binding.tvPulse.text = "${data.pulse}"
         binding.tvTemperature.text = "${data.temperature}"
         updateLocationOnMap(data.location)
+
+        binding.tvDistance.text = "${distCounter}"
+
         thermometerView.setTemperature(data.temperature)
     }
 
@@ -626,14 +628,19 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
         binding.btnLock.setOnClickListener {
             val pckg:Package = Package(HeaderTypes.LOCK.value)
 
-            if (!UI.Locked)
-                binding.btnLock.setText("Lock")
-            else
-                binding.btnLock.setText("Unlock")
-
             pckg.intToBytes(if (!UI.Locked) 1 else 0)
             pckg.Logpckg()
-            try{BtInterface.send(pckg)}
+            try{
+                BtInterface.send(pckg)
+                if (!UI.Locked){
+                    binding.btnLock.setText("Unlock")
+                    UI.Locked = true
+                }
+                else{
+                    binding.btnLock.setText("Lock")
+                    UI.Locked = false
+                }
+            }
             catch(e:UninitializedPropertyAccessException){}
         }
 
@@ -648,6 +655,26 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
 
     }
 
+
+    public override fun crash(){
+        runOnUiThread {
+            val alertDialogBuilder = AlertDialog.Builder(this)
+            alertDialogBuilder.setTitle("Crash")
+            alertDialogBuilder.setMessage("You are doomed")
+            val dialog = alertDialogBuilder.create()
+            dialog.show()
+        }
+    }
+    public override fun distance(dist:Int){
+        runOnUiThread {
+            distCounter++
+            val alertDialogBuilder = AlertDialog.Builder(this)
+            alertDialogBuilder.setTitle("Distance")
+            alertDialogBuilder.setMessage("Distance was ${dist}")
+            val dialog = alertDialogBuilder.create()
+            dialog.show()
+        }
+    }
     //falls später mal nötig, weil lieber zoll als cm
     //Zoll = Zentimeter / 2,54
     //Zentimeter = Zoll * 2,54

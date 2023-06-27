@@ -6,46 +6,52 @@ package com.example.dtprojectnew
 //		  |Startbyte |       Text   Negativ     Kommazahl | Msg-ID |   Typ |  Anzahl der Ganzzahl |  Länge    |     Msg
 //		  |			 |								      |	       |       |        Packages      | der Msg   |
 
+import android.preference.PreferenceActivity.Header
 import android.util.Log
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlin.math.pow
 //VERALTET!!!!!!
 class Package {
     val TAG = "Package"
-    var Header:ByteArray = ByteArray(6)
+    var Header:ByteArray = ByteArray(HeaderIndizes.TOTALHEADERSIZE.value)
     lateinit var Msg:ByteArray
     var msglength:UInt = 0u
     val GEN_POLYNOM: UByte = 0x3Du.toUByte()
     var CRC:UByte = 0u
 
     constructor(Typ:Byte){
-        this.Header[0] = HeaderTypes.START.value
-        this.Header[3] = Typ
+        this.Header[HeaderIndizes.STARTBYTE.value] = HeaderTypes.START.value
+        this.Header[HeaderIndizes.TYP.value] = Typ
     }
 
     constructor():this(0.toByte()){}
 
     private fun setNgtvBit() {
         // Setze das Negativ-Bit im Header
-        this.Header[1] = (this.Header[1].toInt() or 0x02).toByte()
+        this.Header[HeaderIndizes.ADITTIONALINF.value] = (this.Header[HeaderIndizes.ADITTIONALINF.value].toInt() or 0x02).toByte()
     }
 
     private fun setSize(size: Byte) {
         // Setze die Länge der Nachricht im Header
-        this.Header[5] = size
+        this.Header[HeaderIndizes.TOTALSIZE.value] = size
         this.msglength = size.toUInt()
     }
 
     private fun setIntSize(size: Byte) {
         // Setze die Länge der ganzzahligen Bytes im Header
-        this.Header[4] = size
+        this.Header[HeaderIndizes.INTSIZE.value] = size
     }
 
     private fun setFltBit() {
         // Setze das Nachkomma-Bit im Header
-        this.Header[1] = (this.Header[1].toInt() or 0x01).toByte()
+        this.Header[HeaderIndizes.ADITTIONALINF.value] = (this.Header[HeaderIndizes.ADITTIONALINF.value].toInt() or 0x01).toByte()
     }
-
+    private fun setFltSize(size: Byte){
+        this.Header[HeaderIndizes.FLTSIZE.value] = size
+    }
+    private fun getFltSize():Byte{
+        return this.Header[HeaderIndizes.FLTSIZE.value]
+    }
     fun intToBytes(value: Int) {
         var numintBytes:Byte
 
@@ -73,13 +79,14 @@ class Package {
         }
     }
 
-    fun floatToBytes(value: Float, precision: Int) {
+    fun floatToBytes(value: Float, precision: Byte) {
         val intValue = value.toInt()
         val aftPoint = (value * 10.0.pow(precision.toDouble())).toInt() - (intValue * 10.0.pow(precision.toDouble())).toInt()
 
         // Ist Kommazahl, setze passendes Bit
         if (precision > 0) {
             setFltBit()
+            setFltSize(precision)
         }
 
         intToBytes(intValue)
@@ -124,6 +131,7 @@ class Package {
             result *=-1
         return result
     }
+    //TODO hier muss das mit dem Float noch gemacht werden...
     fun combineFltBytesToNumber():Float{
         val decpart:Int = combineIntBytesToNumber()
         val Fltstart:Int = this.getIntsize().toInt()
@@ -135,7 +143,7 @@ class Package {
             for (i in Fltstart until this.getTotalsize().toInt())
                 tmpInt = tmpInt shl 8 or (this.Msg[i].toInt() and 0xFF)
 
-            Fltpart = tmpInt/10f.pow(tmpInt.toString().count())
+            Fltpart = tmpInt/10f.pow(this.getFltSize().toInt())
             if(this.isNgtv())
                 Fltpart *=-1
         }
@@ -147,7 +155,7 @@ class Package {
     fun BytetoHeadercpy(header:ByteArray){
         try {
             header.copyInto(Header)
-            msglength = Header[5].toUInt()
+            msglength = Header[HeaderIndizes.TOTALSIZE.value].toUInt()
         }
         catch (e:IndexOutOfBoundsException){
             Log.e(TAG, "The transmittet Header has not the right size of 6")
@@ -162,22 +170,22 @@ class Package {
         }
     }
     fun isNgtv():Boolean{
-        return (this.Header[1].toInt() and 0x02) != 0
+        return (this.Header[HeaderIndizes.ADITTIONALINF.value].toInt() and 0x02) != 0
     }
     fun getTotalsize():Short{
-        return Header[5].toShort()
+        return Header[HeaderIndizes.TOTALSIZE.value].toShort()
     }
     fun getIntsize():Short{
-        return Header[4].toShort()
+        return Header[HeaderIndizes.INTSIZE.value].toShort()
     }
     fun getTyp():Short{
-        return Header[3].toShort()
+        return Header[HeaderIndizes.TYP.value].toShort()
     }
     fun getmsgID():Short{
-        return Header[2].toShort()
+        return Header[HeaderIndizes.MSGID.value].toShort()
     }
     fun getadditByte():Short{
-        return Header[1].toShort()
+        return Header[HeaderIndizes.ADITTIONALINF.value].toShort()
     }
 
     fun NoFunctionFound(){
@@ -202,14 +210,14 @@ class Package {
         return this::NoFunctionFound
     }
     fun isFloat():Boolean{
-        return (this.Header[1].toInt() and 0x01) == 0x01
+        return (this.Header[HeaderIndizes.ADITTIONALINF.value].toInt() and 0x01) == 0x01
     }
     //Es ist ein Int wenn es kein float und kein Text ist
     fun isInt():Boolean{
         return (!this.isFloat() and !this.isTxt())
     }
     fun isTxt():Boolean{
-        return ((this.Header[1].toInt() and 0x04) == 0x04)
+        return ((this.Header[HeaderIndizes.ADITTIONALINF.value].toInt() and 0x04) == 0x04)
     }
     fun isMsg():Boolean{
         return ((this.getTyp().toByte() == HeaderTypes.MSG.value) and this.isTxt())
@@ -228,7 +236,7 @@ class Package {
         var crc: UByte = 0u
 
         // Überspringe das SFD
-        for (i in 1 until 6) {
+        for (i in 1 until HeaderIndizes.TOTALHEADERSIZE.value) {
             crc = crc xor this.Header[i].toUByte()
 
             for (j in 0 until 8) {

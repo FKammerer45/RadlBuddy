@@ -19,6 +19,8 @@ import kotlin.reflect.typeOf
 
 interface ConnectionStatusObserver {
     fun onConnectionLost()
+    fun crash()
+    fun distance(dist:Int)
 }
 
 class BluetoothInterface(private val cntxt: MainActivity):Thread() {
@@ -33,6 +35,9 @@ class BluetoothInterface(private val cntxt: MainActivity):Thread() {
 
     private var aliveTimer: Timer? = null
 
+    fun crash(){
+        cntxt.crash()
+    }
     fun startConnectionTimer(time:Long) {
         Log.i(TAG, "Wir starten Timer...")
         aliveTimer?.cancel()
@@ -136,26 +141,32 @@ class BluetoothInterface(private val cntxt: MainActivity):Thread() {
             while(!stop_listening && !currentThread().isInterrupted){
                 //Log.i(TAG, "Current available Inpt ${Inpt.available()}")
 
-//					         additional information
-//Package:|   0xEF   | 0 0 0   0       0           0      |  0x00  |  0x00 |         0x00         |  0x00     |     ...
-//		  |Startbyte |       Text   Negativ     Kommazahl | Msg-ID |   Typ |  Anzahl der Ganzzahl |  Länge    |     Msg
-//		  |			 |								      |	       |       |        Packages      | der Msg   |
-                if(Inpt.available()>=6){
+
+//					        additional information
+//Package:|   0xEF   | 0 0 0   0       0           0      |  0x00  |  0x00 |         0x00         |  0x00     |   0x00   |     ...		|	0x00
+//		  |Startbyte |       Text   Negativ     Kommazahl | Msg-ID |   Typ |  Anzahl der Ganzzahl |  Laenge   | FltLänge |     Msg		|	 CRC
+//		  |			 |								      |	       |       |        Packages      | der Msg   |          |				|
+                //Header ist angekommen komplett
+                if(Inpt.available()>=HeaderIndizes.TOTALHEADERSIZE.value){
                     val startCommByte = Inpt.read().toByte()
                     if(startCommByte != HeaderTypes.START.value){
                         Log.e(TAG, "Unallowed Start comm-byte $startCommByte, ${"0x"+(startCommByte.toInt() and 0xFF).toUInt().toString(16)}")
                         continue
                     }
                     Log.i(TAG, "Got Message")
-                    val header = ByteArray(6)
+                    val header = ByteArray(HeaderIndizes.TOTALHEADERSIZE.value)
                     header[0] = 0xEF.toByte()
-                    for(i in 1 until 6){
+                    for(i in 1 until HeaderIndizes.TOTALHEADERSIZE.value){
                         header[i] = Inpt.read().toByte()
                     }
                     val pckg:Package = Package()
                     pckg.BytetoHeadercpy(header)
-
-                    var buffer = ByteArray(pckg.getTotalsize().toInt())
+                    var buffer:ByteArray
+                    try{buffer = ByteArray(pckg.getTotalsize().toInt())}
+                    catch(e:java.lang.NegativeArraySizeException){
+                        Log.e(TAG, "Wir haben eine negative Array Size?? Wie ist das möglich ${pckg.getTotalsize().toInt()}")
+                        continue
+                    }
                     var currBytes:Int = 0
 
                     Log.i(TAG, "Msg Length is ${pckg.getTotalsize()}")
@@ -176,7 +187,15 @@ class BluetoothInterface(private val cntxt: MainActivity):Thread() {
                         }
                         catch(e:java.io.IOException){}
                     }
+                    else if(pckg.getTyp().toByte() == HeaderTypes.CRASH.value)
+                        this.crash()
                     else{
+                        if(pckg.getTyp().toByte() == HeaderTypes.DISTANCE.value){
+                            val dist = pckg.combineIntBytesToNumber()
+                            if(dist <= 100)
+                                this.distance(dist)
+                        }
+
                         Log.i(TAG, "Wir haben ein normales Package bekommen")
                         this.alertObservers(pckg)
                     }
@@ -198,6 +217,9 @@ class BluetoothInterface(private val cntxt: MainActivity):Thread() {
 
     public fun disconnect(){
         stop_listening = true
+    }
+    public fun distance(dist:Int){
+        cntxt.distance(dist)
     }
     public override fun interrupt() {
         Log.i(TAG, "Thread was properly terminated")

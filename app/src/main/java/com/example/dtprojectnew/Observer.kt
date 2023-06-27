@@ -12,6 +12,8 @@ enum class HeaderTypes(val value: Byte) {
     LOCK (0x05.toByte()),
     RADIUS (0x06.toByte()),
     TEMPERATURE (0x07.toByte()),
+    DISTANCE (0x08.toByte()),
+
     STOP (0xF0.toByte()),
     CONTINUE (0xF1.toByte()),
     CONNECTED (0xF4.toByte()),
@@ -19,8 +21,22 @@ enum class HeaderTypes(val value: Byte) {
     MSG (0xF3.toByte()),
     ERROR (0xFF.toByte()),
     START (0xEF.toByte()),
-    ALIVE (0xF5.toByte())
+    ALIVE (0xF5.toByte()),
+    CRASH (0xF6.toByte())
 }
+
+enum class HeaderIndizes(val value: Int){
+    STARTBYTE (0),
+    TOTALHEADERSIZE (7),
+    TYP (3),
+    TOTALSIZE (5),
+    ADITTIONALINF (1),
+    MSGID (2),
+    INTSIZE (4),
+    FLTSIZE (6)
+}
+
+
 abstract class Observer(){
     abstract fun alert(pckg:Package):Boolean
 }
@@ -60,6 +76,12 @@ class ConnectionObserver() :Observer() {
                 Log.i(TAG, "Geschwindigkeit")
                 for (k in UI){
                     k.setSpeed(fnct())
+                }
+            }
+            HeaderTypes.DISTANCE.value->{
+                Log.i(TAG, "Distance")
+                for(k in UI){
+                    k.setDistance(fnct())
                 }
             }
             HeaderTypes.LOCK.value->{
