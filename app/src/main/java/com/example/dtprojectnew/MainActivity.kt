@@ -38,7 +38,7 @@ import java.lang.Math.cos
 import java.util.UUID
 import android.location.Location
 import android.location.LocationListener
-
+import com.google.android.material.snackbar.Snackbar
 
 
 data class MonitoredData(
@@ -387,11 +387,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
 
     private fun updateTextViews() {
         val data = getDataFromSensors()
-        setTilt(data.tilt) //
-        binding.tvSpeed.text = "${data.speed}"
-        binding.tvTilt.text = "${data.tilt}"
-        binding.tvPulse.text = "${data.pulse}"
-        binding.tvTemperature.text = "${data.temperature}"
+        setTilt(-data.tilt) //
+        //binding.tvSpeed.text = "${data.speed}"
+        binding.tvSpeed.text = String.format("%04.1f",data.speed)
+        //binding.tvTilt.text = "${data.tilt}"
+        binding.tvTilt.text = String.format("%+04.0f",data.tilt)
+        //binding.tvPulse.text = "${data.pulse}"
+        binding.tvPulse.text = String.format("%03d",data.pulse)
+        //binding.tvTemperature.text = "${data.temperature}"
+        binding.tvTemperature.text = String.format("%+05.1f",data.temperature)
         updateLocationOnMap(data.location)
 
         binding.tvDistance.text = "${distCounter}"
@@ -605,6 +609,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
         pulseAnimation.startAnimation(binding.ivHeart, pulseValue)
 
 
+        binding.btnInfo.setOnClickListener{
+            val snackbar = Snackbar.make(it, "Represents the number of times a car has come too close to the bicycle while riding.", Snackbar.LENGTH_LONG)
+            snackbar.show()
+        }
 
         binding.btnClearMap.setOnClickListener{
             AlertDialog.Builder(this)
