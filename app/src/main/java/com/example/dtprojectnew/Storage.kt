@@ -25,6 +25,7 @@ class Storage : AppCompatActivity() {
     private lateinit var mMap: GoogleMap
     private lateinit var mapFragment: SupportMapFragment
 
+
     private fun displayStats(buttonName: String) {
         val fileName = "$buttonName.json"
         val fileContents = readJsonFile(fileName)
@@ -49,11 +50,32 @@ class Storage : AppCompatActivity() {
         val temperatureStats = calculateStats(temperatureValues)
         val tiltStats = calculateStats(tiltValues)
 
-        binding.tvSpeedStats.text = "Speed: Min ${speedStats.min} / Max ${speedStats.max} / Avg ${speedStats.avg}"
-        binding.tvPulseStats.text = "Pulse: Min ${pulseStats.min} / Max ${pulseStats.max} / Avg ${pulseStats.avg}"
-        binding.tvTemperatureStats.text = "Temperature: Min ${temperatureStats.min} / Max ${temperatureStats.max} / Avg ${temperatureStats.avg}"
-        binding.tvTiltStats.text = "Pitch/Tilt: Min ${tiltStats.min} / Max ${tiltStats.max} / Avg ${tiltStats.avg}"
+        // Speed stats
+        binding.tvSpeedMin.text = "${speedStats.min}"
+        binding.tvSpeedMax.text = "${speedStats.max}"
+        binding.tvSpeedAvg.text = "${speedStats.avg}"
 
+        // Pulse stats
+        binding.tvPulseMin.text = "${pulseStats.min}"
+        binding.tvPulseMax.text = "${pulseStats.max}"
+        binding.tvPulseAvg.text = "${pulseStats.avg}"
+
+        // Temperature stats
+        binding.tvTempMin.text = "${temperatureStats.min}"
+        binding.tvTempMax.text = "${temperatureStats.max}"
+        binding.tvTempAvg.text = "${temperatureStats.avg}"
+
+        // Tilt stats
+        binding.tvTiltMin.text = "${tiltStats.min}"
+        binding.tvTiltMax.text = "${tiltStats.max}"
+        binding.tvTiltAvg.text = "${tiltStats.avg}"
+
+
+        /*
+                binding.tvPulseStats.text = "Pulse: Min ${pulseStats.min} / Max ${pulseStats.max} / Avg ${pulseStats.avg}"
+                binding.tvTemperatureStats.text = "Temperature: Min ${temperatureStats.min} / Max ${temperatureStats.max} / Avg ${temperatureStats.avg}"
+                binding.tvTiltStats.text = "Pitch/Tilt: Min ${tiltStats.min} / Max ${tiltStats.max} / Avg ${tiltStats.avg}"
+        */
         mapFragment.getMapAsync { googleMap ->
             // Save a reference to the map for later use
             mMap = googleMap
@@ -71,6 +93,8 @@ class Storage : AppCompatActivity() {
             }
         }
     }
+
+
 
 
 
