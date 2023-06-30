@@ -136,7 +136,6 @@ class BluetoothInterface(private val cntxt: MainActivity):Thread() {
     }
 
     public override fun run(){
-
         try{
             while(!stop_listening && !currentThread().isInterrupted){
                 //Log.i(TAG, "Current available Inpt ${Inpt.available()}")
@@ -183,17 +182,19 @@ class BluetoothInterface(private val cntxt: MainActivity):Thread() {
                         try{
                             this.send(pckg)
                             Log.i(TAG, "Ladies n Gentelman we've gottem")
-                            this.startConnectionTimer(6000)
+                            this.startConnectionTimer(10000)
+                            pckg.Logpckg()
                         }
                         catch(e:java.io.IOException){}
                     }
                     else if(pckg.getTyp().toByte() == HeaderTypes.CRASH.value)
                         this.crash()
+                        //Log.i("Prob", "Crashed")
                     else{
                         if(pckg.getTyp().toByte() == HeaderTypes.DISTANCE.value){
                             val dist = pckg.combineIntBytesToNumber()
-                            if(dist <= 100)
-                                this.distance(dist)
+                            //if(dist <= 100)
+                            this.distance(dist)
                         }
 
                         Log.i(TAG, "Wir haben ein normales Package bekommen")

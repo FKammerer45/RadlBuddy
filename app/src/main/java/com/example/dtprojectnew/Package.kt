@@ -229,7 +229,6 @@ class Package {
         Log.d(TAG, "Msg:")
         for(byte in Msg)
             Log.d(TAG,byte.toUByte().toString(2).padStart(8, '0'))
-
     }
 
     fun calculateCRC(): UByte {

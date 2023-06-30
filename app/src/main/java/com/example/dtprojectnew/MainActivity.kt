@@ -50,7 +50,8 @@ data class MonitoredData(
     val Distance: Int,
     val pathM: MutableList<LatLng> = mutableListOf()
 )
-lateinit var BtInterface:BluetoothInterface
+lateinit var BtInterfaceSens:BluetoothInterface
+lateinit var BtInterfaceLck:BluetoothInterface
 
 val UI:UIInterface = UIInterface()
 val Obs:ConnectionObserver = ConnectionObserver()
@@ -151,12 +152,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
 
     private fun con_disconDevice(){
         val TAG = "con_discnwithDevice"
-        if(::BtInterface.isInitialized && BtInterface.isConnected()){
+        val connective = if (::BtInterfaceSens.isInitialized && BtInterfaceSens.isConnected()) {
+            true
+        } else ::BtInterfaceLck.isInitialized && BtInterfaceLck.isConnected()
+        Log.i(TAG, "Connectivity ist $connective")
+        if(connective){
             Log.i(TAG, "Disconnecting Device")
             disconnectDevice()
         }
         else{
-            BtInterface = BluetoothInterface(this)
+            BtInterfaceSens = BluetoothInterface(this)
+            BtInterfaceLck = BluetoothInterface(this)
             Log.i(TAG, "Connecting Device")
             if(connectDevice())
                 binding.btnConnect.setText("Disconnect")
@@ -165,7 +171,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
 
     override fun onConnectionLost() {
         runOnUiThread {
-            if(::BtInterface.isInitialized && BtInterface.isConnected()){
+            if(::BtInterfaceLck.isInitialized && BtInterfaceLck.isConnected()){
                 binding.btnLock.text = "Lock" // Setze den Text des Buttons auf "Lock"
                 Log.i("onConnectionLost", "Disconnecting Device")
                 disconnectDevice()
@@ -176,25 +182,28 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
     fun disconnectDevice(){
         //Thread interrupten, dort wird das interrupt flag gesetzt, darauf wird auch überprüft
         binding.btnConnect.setText("Connect")
-        var pckg:Package = Package(HeaderTypes.CONNECTED.value)
+        val pckg:Package = Package(HeaderTypes.CONNECTED.value)
         pckg.intToBytes(0)
-        try {BtInterface.send(pckg)}
-        catch(e:UninitializedPropertyAccessException){
-            Log.e("disconnectDevice", "BtInterface was not inititialized couldnt send not connected")
-        }
-        pckg = Package(HeaderTypes.LOCK.value)
-        pckg.intToBytes(1)
         try {
-            BtInterface.send(pckg)
-            binding.btnLock.setText("Unlock")
+            BtInterfaceSens.send(pckg)
+            BtInterfaceSens.interrupt()
         }
         catch(e:UninitializedPropertyAccessException){
-            Log.e("disconnectDevice", "BtInterface was not inititialized couldnt send Close Lock")
+            Log.e("disconnectSensorDevice", "BtInterface was not inititialized couldnt send not connected")
         }
-
-        try{BtInterface.interrupt()}
+        val pckgLck:Package = Package(HeaderTypes.LOCK.value)
+        pckgLck.intToBytes(1)
+        try {
+            BtInterfaceLck.send(pckgLck)
+            binding.btnLock.setText("Unlock") }
         catch(e:UninitializedPropertyAccessException){
-            Log.e("disconnectDevice", "BtInterface was not inititialized before interrupt")
+            Log.e("disconnectDevice", "BtInterface was not inititialized couldnt send Close Lock") }
+        try {
+            BtInterfaceLck.send(pckg)
+            BtInterfaceLck.interrupt()
+        }
+        catch(e:UninitializedPropertyAccessException){
+            Log.e("disconnectLockDevice", "BtInterface was not inititialized couldnt send not connected")
         }
     }
     @SuppressLint("MissingPermission")
@@ -245,20 +254,25 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
                     Log.d("Main", "Name " + device.name)
                     Log.d("Main", "MAC  " + device.address)
                 }
-                val searchedadress = "00:22:09:01:02:9E"
-                //val searchedadress = "00:14:03:02:09:42"
-                val wanted = pairedDevices?.find { it.address == searchedadress }
-                if (wanted != null) {
-                    Log.v("Main", "Found Adress " + wanted.address + " with name " + wanted.name)
-                    //btn.apply{text = "Connecting..."}
-                    val Adpt:BluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
-                    val device = Adpt.getRemoteDevice(wanted.address)
+                val searchedadressSens = "C8:C9:A3:C9:09:F6"
+                val searchedadressLck = "C8:C9:A3:D2:67:D2"
 
-                    if(BtInterface.setSocket(device, UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))){
+
+                val wantedSens = pairedDevices?.find { it.address == searchedadressSens }
+                val wantedLck = pairedDevices?.find { it.address == searchedadressLck }
+
+                if (wantedSens != null && wantedLck != null) {
+
+                    val Adpt:BluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+                    val deviceSens = Adpt.getRemoteDevice(wantedSens.address)
+                    val deviceLck = Adpt.getRemoteDevice(wantedLck.address)
+                    if(BtInterfaceSens.setSocket(deviceSens, UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")) && BtInterfaceLck.setSocket(deviceLck, UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))){
                         //TODO trenn das obere möglichst bald wieder in zwei BtInterface.connect_to_Socket()
                         Obs.addInterface(UI)
-                        BtInterface.addObserver(Obs)
-                        BtInterface.start()
+                        BtInterfaceSens.addObserver(Obs)
+                        BtInterfaceSens.start()
+                        BtInterfaceLck.addObserver(Obs)
+                        BtInterfaceLck.start()
                         showSavedProfiles()
                         return true
                     }
@@ -266,7 +280,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
                         val alertDialogBuilder = AlertDialog.Builder(this@MainActivity)
                         alertDialogBuilder.setTitle("Connecting went wrong")
                         alertDialogBuilder.setMessage("Maybe your Microcontroller is turned off?")
-
+                        disconnectDevice()
                         val dialog = alertDialogBuilder.create()
                         dialog.show()
                         return false
@@ -322,17 +336,18 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
                     if(::fnd.isInitialized && fnd != null){
                         //Wenn Gerät gefunden öffne einen Socket zu dem Gerät und starte dann das Interface sollte man abfangen, dass das Gerät
                         //in der Zwischenzeit ausgemacht wurde?? wäre schon irgendwie Schwachsinn das zu tun bzw vielleicht gehen Baterrien leer
-                        if(BtInterface.setSocket(fnd, UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))){
+                        val k = if (fnd.address == "C8:C9:A3:D2:67:D0") BtInterfaceLck else BtInterfaceSens
+                        if(k.setSocket(fnd, UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))){
                             //TODO trenn das obere möglichst bald wieder in zwei BtInterface.connect_to_Socket()
                             Obs.addInterface(UI)
-                            BtInterface.addObserver(Obs)
-                            BtInterface.start()
+                            k.addObserver(Obs)
+                            k.start()
                             showSavedProfiles()
                             binding.btnConnect.setText("Disconnect")
                         }
                     }
                     else if(!::fnd.isInitialized){
-                        Log.e(TAG, "HC-05 probably not in range or turned off")
+                        Log.e(TAG, "HC-05 or other thing probably not in range or turned off")
                         val alertDialogBuilder = AlertDialog.Builder(this@MainActivity)
                         alertDialogBuilder.setTitle("Searching went wrong")
                         alertDialogBuilder.setMessage("Maybe your Microcontroller is turned off?")
@@ -358,7 +373,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
                             Log.d(TAG,"${device.name} ${device.address}")
                             //"00:14:03:02:09:42"
 
-                            if(device.address == "00:22:09:01:02:9E"){
+                            if(device.address == "C8:C9:A3:C9:09:F6" || device.address == "C8:C9:A3:D2:67:D2"){
                                 fnd = device
                                 Log.d(TAG, "Found the Device")
                                 //val bluetoothManager: BluetoothManager = getSystemService(BluetoothManager::class.java)
@@ -639,7 +654,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
             pckg.intToBytes(if (!UI.Locked) 1 else 0)
             pckg.Logpckg()
             try{
-                BtInterface.send(pckg)
+                BtInterfaceLck.send(pckg)
                 if (!UI.Locked){
                     binding.btnLock.setText("Unlock")
                     UI.Locked = true
@@ -675,14 +690,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
     }
     public override fun distance(dist:Int){
         runOnUiThread {
-            distCounter++
+            if(dist <= 100)
+                distCounter++
             val alertDialogBuilder = AlertDialog.Builder(this)
             alertDialogBuilder.setTitle("Distance")
-            alertDialogBuilder.setMessage("Distance was ${dist}")
+            alertDialogBuilder.setMessage("Distance was ${dist}cm")
             val dialog = alertDialogBuilder.create()
             dialog.show()
         }
     }
+
     //falls später mal nötig, weil lieber zoll als cm
     //Zoll = Zentimeter / 2,54
     //Zentimeter = Zoll * 2,54
@@ -701,16 +718,24 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
             //Sending that we are connected
             var pckg:Package = Package(HeaderTypes.CONNECTED.value)
             pckg.intToBytes(1)
-            try { BtInterface.send(pckg) }
+            try { BtInterfaceSens.send(pckg) }
+            catch(e:UninitializedPropertyAccessException){}
+
+            try { BtInterfaceLck.send(pckg) }
             catch(e:UninitializedPropertyAccessException){}
 
             pckg = Package(HeaderTypes.RADIUS.value)
             pckg.floatToBytes(selectedProfile.value, 3)
             pckg.Logpckg()
-            try{BtInterface.send(pckg)}
+            try{BtInterfaceSens.send(pckg)}
             catch(e:UninitializedPropertyAccessException){}
 
-            BtInterface.startConnectionTimer(10000)
+            try{BtInterfaceSens.startConnectionTimer(10000)}
+            catch(e:UninitializedPropertyAccessException){}
+
+            try{BtInterfaceLck.startConnectionTimer(10000)}
+            catch(e:UninitializedPropertyAccessException){}
+
         }
 
         alertDialogBuilder.setPositiveButton("Create Profile") { _, _ ->
@@ -744,17 +769,22 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
                     //Sending that we are connected
                     var pckg:Package = Package(HeaderTypes.CONNECTED.value)
                     pckg.intToBytes(1)
-                    try { BtInterface.send(pckg) }
+                    try { BtInterfaceSens.send(pckg) }
                     catch(e:UninitializedPropertyAccessException){}
                     //Sending the value
+                    try { BtInterfaceLck.send(pckg) }
+                    catch(e:UninitializedPropertyAccessException){}
 
                     pckg = Package(HeaderTypes.RADIUS.value)
                     pckg.floatToBytes(profile.value, 3)
                     pckg.Logpckg()
-                    try{BtInterface.send(pckg)}
+                    try{BtInterfaceSens.send(pckg)}
                     catch(e:UninitializedPropertyAccessException){}
 
-                    BtInterface.startConnectionTimer(10000)
+                    try{ BtInterfaceSens.startConnectionTimer(10000) }
+                    catch(e:UninitializedPropertyAccessException){}
+                    try{BtInterfaceLck.startConnectionTimer(10000)}
+                    catch(e:UninitializedPropertyAccessException){}
                 }
             }
             .setNegativeButton("Abort", null)
@@ -774,22 +804,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
         }
 
         //Thread interrupten, dort wird das interrupt flag gesetzt, darauf wird auch überprüft
-        var pckg:Package = Package(HeaderTypes.CONNECTED.value)
-        pckg.intToBytes(0)
-        try {BtInterface.send(pckg)}
-        catch(e:UninitializedPropertyAccessException){
-            Log.e("OnDestroy", "BtInterface was not inititialized couldnt send not connected")
-        }
-        pckg = Package(HeaderTypes.LOCK.value)
-        pckg.intToBytes(1)
-        try {BtInterface.send(pckg)}
-        catch(e:UninitializedPropertyAccessException){
-            Log.e("OnDestroy", "BtInterface was not inititialized couldnt send Close Lock")
-        }
-        try{BtInterface.interrupt()}
-        catch(e:UninitializedPropertyAccessException){
-            Log.e("OnDestroy", "BtInterface was not inititialized before interrupt")
-        }
+        this.disconnectDevice()
         super.onDestroy()
     }
 }
