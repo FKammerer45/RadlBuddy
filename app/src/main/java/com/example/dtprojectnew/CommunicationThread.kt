@@ -23,7 +23,7 @@ interface ConnectionStatusObserver {
     fun distance(dist:Int)
 }
 
-class BluetoothInterface(private val cntxt: MainActivity):Thread() {
+class BluetoothInterface(private var cntxt: MainActivity):Thread() {
     var k:Float = -10f
     private lateinit var mmSckt: BluetoothSocket
     var TAG = "BluetoothInterface"
@@ -221,6 +221,9 @@ class BluetoothInterface(private val cntxt: MainActivity):Thread() {
     }
     public fun distance(dist:Int){
         cntxt.distance(dist)
+    }
+    public fun setCntxt(cntxt1: MainActivity){
+        this.cntxt = cntxt1
     }
     public override fun interrupt() {
         Log.i(TAG, "Thread was properly terminated")

@@ -519,6 +519,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, MapUpdateProvider,
         arrowImageView = binding.ivTilt
         thermometerView = binding.thermometerView
 
+        if(::BtInterfaceSens.isInitialized && ::BtInterfaceLck.isInitialized){
+            BtInterfaceSens.setCntxt(this)
+            BtInterfaceLck.setCntxt(this)
+        }
 
         // get location data from phone
         if (ActivityCompat.checkSelfPermission(

@@ -40,10 +40,15 @@ class Storage : AppCompatActivity() {
         val locationValues = dataList.map { it.location }
         val temperatureValues = dataList.map { it.temperature }
         val tiltValues = dataList.map { it.tilt }
+
         val parsedLocations = locationValues.map {
-            val split = it.split(",")
-            LatLng(split[0].toDouble(), split[1].toDouble())
-        }
+            if (it.isNotEmpty()) {
+                val split = it.split(",")
+                LatLng(split[0].toDouble(), split[1].toDouble())
+            } else {
+                null // Return null when location is empty
+            }
+        }.filterNotNull()
 
         val speedStats = calculateStats(speedValues)
         val pulseStats = calculateStats(pulseValues)
